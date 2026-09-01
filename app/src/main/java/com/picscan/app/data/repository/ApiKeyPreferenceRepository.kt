@@ -21,9 +21,6 @@ class ApiKeyPreferenceRepository(private val context: Context) {
         const val DEFAULT_MODEL = "gemini-3.6-flash"
         val AVAILABLE_MODELS = listOf(
             "gemini-3.6-flash" to "Gemini 3.6 Flash (Neuestes High-Speed-Modell)",
-            "gemini-2.0-flash" to "Gemini 2.0 Flash (Next-Gen High-Speed)",
-            "gemini-1.5-flash" to "Gemini 1.5 Flash (Schnell & sparsam)",
-            "gemini-1.5-pro" to "Gemini 1.5 Pro (Tiefgehende Sommelier-Analyse)"
         )
     }
 

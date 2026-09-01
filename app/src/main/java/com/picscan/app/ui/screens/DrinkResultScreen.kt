@@ -5,7 +5,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -24,7 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.picscan.app.data.model.BeerListType
 import com.picscan.app.data.model.BeerVerdict
+import com.picscan.app.data.model.SavedBeerItem
 import com.picscan.app.ui.components.BeerVerdictCard
 import com.picscan.app.ui.components.BeerVerdictCelebrationDialog
 import com.picscan.app.ui.components.DrinkCategoryBadge
@@ -38,10 +41,12 @@ import java.io.File
 @Composable
 fun DrinkResultScreen(
     viewModel: ScannerViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToBeers: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val allSavedBeers by viewModel.allSavedBeers.collectAsState()
     val drink = uiState.currentDrink
 
     if (drink == null) {
@@ -61,6 +66,13 @@ fun DrinkResultScreen(
     val beerVerdict = remember(drink) { drink.resolveBeerVerdict() }
     var showBeerAlert by remember(drink) { mutableStateOf(beerVerdict != BeerVerdict.NONE) }
 
+    // Check if this beer is already in the Firebase database
+    val savedBeer = remember(allSavedBeers, drink.name) {
+        allSavedBeers.find { it.name.equals(drink.name, ignoreCase = true) }
+    }
+
+    var showEditNoteDialog by remember { mutableStateOf(false) }
+
     // Display animated modal overlay on scan
     if (showBeerAlert && beerVerdict != BeerVerdict.NONE) {
         BeerVerdictCelebrationDialog(
@@ -69,7 +81,17 @@ fun DrinkResultScreen(
         )
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(uiState.saveSuccessMessage) {
+        uiState.saveSuccessMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg, duration = SnackbarDuration.Short)
+            viewModel.clearSaveSuccessMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Getränkeprofil", fontWeight = FontWeight.Bold) },
@@ -79,6 +101,9 @@ fun DrinkResultScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onNavigateToBeers) {
+                        Icon(Icons.Default.SportsBar, contentDescription = "Meine Biere")
+                    }
                     IconButton(onClick = {
                         val shareText = buildString {
                             appendLine("🍹 ${drink.name}")
@@ -121,16 +146,27 @@ fun DrinkResultScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .padding(16.dp)
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Button(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.fillMaxWidth(),
+                    OutlinedButton(
+                        onClick = onNavigateToBeers,
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Neues Getränk scannen", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.SportsBar, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Meine Biere", fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = onNavigateBack,
+                        modifier = Modifier.weight(1.2f),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Neuer Scan", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -183,6 +219,238 @@ fun DrinkResultScreen(
                     drink = drink,
                     onShowFullAlert = { showBeerAlert = true }
                 )
+            }
+
+            // FIREBASE BEER SAVING CARD ("Kenne ich" vs "Will ich")
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f))
+                    ),
+                    width = 1.5.dp
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Firebase Cloud-Speicher",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+
+                        if (savedBeer != null) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            ) {
+                                Text(
+                                    text = if (savedBeer.listType == BeerListType.KNOWN) "✓ In 'Kenne ich'" else "✓ In 'Will ich'",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = if (savedBeer == null)
+                            "Speichere dieses Bier direkt in deiner persönlichen Firebase-Datenbank:"
+                        else
+                            "Dieses Bier ist in deiner Firebase-Sammlung gespeichert. Status oder Notizen anpassen:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    // Two Primary Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // "Kenne ich" Button
+                        val isKnownSelected = savedBeer?.listType == BeerListType.KNOWN
+                        Button(
+                            onClick = {
+                                viewModel.saveBeerToList(drink, BeerListType.KNOWN)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = if (isKnownSelected) {
+                                ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF2E7D32),
+                                    contentColor = Color.White
+                                )
+                            } else {
+                                ButtonDefaults.filledTonalButtonColors()
+                            }
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("🍺", fontSize = 16.sp)
+                                    Text(
+                                        text = "Kenne ich",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                                Text(
+                                    text = "Schon probiert",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        // "Will ich" Button
+                        val isWishlistSelected = savedBeer?.listType == BeerListType.WISHLIST
+                        Button(
+                            onClick = {
+                                viewModel.saveBeerToList(drink, BeerListType.WISHLIST)
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = if (isWishlistSelected) {
+                                ButtonDefaults.buttonColors(
+                                    containerColor = Color(0xFF0277BD),
+                                    contentColor = Color.White
+                                )
+                            } else {
+                                ButtonDefaults.filledTonalButtonColors()
+                            }
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text("📌", fontSize = 16.sp)
+                                    Text(
+                                        text = "Will ich",
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                                Text(
+                                    text = "Wunschliste",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // If saved, show rating & notes editor
+                    if (savedBeer != null) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Deine Bewertung & Notiz:",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    TextButton(
+                                        onClick = { showEditNoteDialog = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Bearbeiten")
+                                    }
+                                }
+
+                                // Interactive Quick Star Rating
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    (1..5).forEach { star ->
+                                        IconButton(
+                                            onClick = {
+                                                viewModel.updateBeerRatingAndNotes(
+                                                    savedBeer.id,
+                                                    if (savedBeer.rating == star.toFloat()) 0f else star.toFloat(),
+                                                    savedBeer.userNotes
+                                                )
+                                            },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (savedBeer.rating >= star) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                                contentDescription = "$star Sterne",
+                                                tint = if (savedBeer.rating >= star) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                    }
+
+                                    if (savedBeer.rating > 0f) {
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${savedBeer.rating.toInt()}/5 Sterne",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                if (savedBeer.userNotes.isNotBlank()) {
+                                    Text(
+                                        text = "„${savedBeer.userNotes}“",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Header info (Category, Name, Brand, Origin)
@@ -531,5 +799,67 @@ fun DrinkResultScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    // Edit Note & Rating Dialog
+    if (showEditNoteDialog && savedBeer != null) {
+        var editRating by remember(savedBeer) { mutableStateOf(savedBeer.rating) }
+        var editNotes by remember(savedBeer) { mutableStateOf(savedBeer.userNotes) }
+
+        AlertDialog(
+            onDismissRequest = { showEditNoteDialog = false },
+            title = { Text("Bewertung & Verkostungsnotiz", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text("Sterne-Bewertung:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        (1..5).forEach { starIndex ->
+                            IconButton(onClick = { editRating = starIndex.toFloat() }) {
+                                Icon(
+                                    imageVector = if (editRating >= starIndex) Icons.Filled.Star else Icons.Outlined.StarOutline,
+                                    contentDescription = "$starIndex Sterne",
+                                    tint = if (editRating >= starIndex) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = editNotes,
+                        onValueChange = { editNotes = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                        label = { Text("Persönliche Notiz") },
+                        placeholder = { Text("Wo getrunken, Eindruck, Geschmack…") },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateBeerRatingAndNotes(savedBeer.id, editRating, editNotes)
+                        showEditNoteDialog = false
+                    }
+                ) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditNoteDialog = false }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
     }
 }

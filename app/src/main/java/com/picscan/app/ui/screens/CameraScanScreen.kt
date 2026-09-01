@@ -42,11 +42,13 @@ fun CameraScanScreen(
     viewModel: ScannerViewModel,
     onNavigateToResult: () -> Unit,
     onNavigateToHistory: () -> Unit,
+    onNavigateToBeers: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
+    val allSavedBeers by viewModel.allSavedBeers.collectAsState()
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -146,46 +148,51 @@ fun CameraScanScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // History Button
-            IconButton(
-                onClick = onNavigateToHistory,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.History,
-                    contentDescription = "Scan-Verlauf",
-                    tint = Color.White
-                )
-            }
-
-            // Title
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.Black.copy(alpha = 0.55f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+            // Left Group: History & Meine Biere (Firebase)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onNavigateToHistory,
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.SportsBar,
-                        contentDescription = null,
-                        tint = Color(0xFFFF9800),
-                        modifier = Modifier.size(18.dp)
+                        imageVector = Icons.Default.History,
+                        contentDescription = "Scan-Verlauf",
+                        tint = Color.White
                     )
-                    Text(
-                        text = "lecker Bierchen!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
-                    )
+                }
+
+                // Meine Biere Button with Badge
+                Surface(
+                    onClick = onNavigateToBeers,
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.Black.copy(alpha = 0.55f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("🍺", fontSize = 14.sp)
+                        Text(
+                            text = "Biere",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (allSavedBeers.isNotEmpty()) {
+                            Badge(
+                                containerColor = Color(0xFFFF9800),
+                                contentColor = Color.Black
+                            ) {
+                                Text("${allSavedBeers.size}", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
 
             // Right controls: Flash & Settings
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = { viewModel.toggleFlash() },
                     modifier = Modifier.background(

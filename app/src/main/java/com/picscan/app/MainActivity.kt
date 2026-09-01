@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.picscan.app.data.model.BeerListType
+import com.picscan.app.ui.screens.BeerCollectionScreen
 import com.picscan.app.ui.screens.CameraScanScreen
 import com.picscan.app.ui.screens.DrinkResultScreen
 import com.picscan.app.ui.screens.HistoryScreen
@@ -27,7 +29,8 @@ class MainActivity : ComponentActivity() {
         ScannerViewModel.provideFactory(
             apiKeyRepo = app.apiKeyRepository,
             scannerRepo = app.geminiRepository,
-            historyRepo = app.historyRepository
+            historyRepo = app.historyRepository,
+            beerRepo = app.beerRepository
         )
     }
 
@@ -58,6 +61,7 @@ fun PicScanNavigation(viewModel: ScannerViewModel) {
                 viewModel = viewModel,
                 onNavigateToResult = { navController.navigate("result") },
                 onNavigateToHistory = { navController.navigate("history") },
+                onNavigateToBeers = { navController.navigate("beers") },
                 onNavigateToSettings = { navController.navigate("settings") }
             )
         }
@@ -65,7 +69,19 @@ fun PicScanNavigation(viewModel: ScannerViewModel) {
         composable("result") {
             DrinkResultScreen(
                 viewModel = viewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToBeers = { navController.navigate("beers") }
+            )
+        }
+
+        composable("beers") {
+            BeerCollectionScreen(
+                viewModel = viewModel,
+                initialTab = BeerListType.KNOWN,
+                onNavigateBack = { navController.popBackStack() },
+                onBeerSelected = {
+                    navController.navigate("result")
+                }
             )
         }
 

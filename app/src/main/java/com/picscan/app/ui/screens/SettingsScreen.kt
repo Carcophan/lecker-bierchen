@@ -42,6 +42,8 @@ fun SettingsScreen(
 
     val currentApiKey by viewModel.apiKey.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
+    val knownBeers by viewModel.knownBeers.collectAsState()
+    val wishlistBeers by viewModel.wishlistBeers.collectAsState()
 
     var apiKeyInput by remember(currentApiKey) { mutableStateOf(currentApiKey) }
     var isApiKeyVisible by remember { mutableStateOf(false) }
@@ -52,7 +54,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Einstellungen & AI-Konfiguration", fontWeight = FontWeight.Bold) },
+                title = { Text("Einstellungen & Konfiguration", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
@@ -69,6 +71,76 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            // Firebase Cloud Database Info Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudQueue,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary
+                        )
+                        Text(
+                            text = "Google Firebase Datenbank",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+
+                    Text(
+                        text = "Deine Biere werden automatisch in Google Firebase Firestore sowie lokal synchronisiert. So stehen deine 'Kenne ich'- und 'Will ich'-Listen jederzeit zur Verfügung.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🍺", fontSize = 16.sp)
+                                Text("Kenne ich: ${knownBeers.size}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("📌", fontSize = 16.sp)
+                                Text("Will ich: ${wishlistBeers.size}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Google AI Pro & API Key Explanation Card
             Card(
                 shape = RoundedCornerShape(16.dp),
@@ -297,7 +369,7 @@ fun SettingsScreen(
                 ) {
                     Text("lecker Bierchen! – AI Getränke- & Bier-Scanner", fontWeight = FontWeight.Bold)
                     Text("Version 1.0.0 (Entwickelt für Android 17 / API 35+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Unterstützt von Google Gemini Vision & CameraX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text("Unterstützt von Google Firebase Firestore, Google Gemini Vision & CameraX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }

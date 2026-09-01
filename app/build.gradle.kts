@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.google.services)
 }
 
 val localProperties = Properties().apply {
@@ -90,6 +91,11 @@ dependencies {
 
     // Google Gemini AI SDK
     implementation(libs.google.generativeai)
+
+    // Firebase (Firestore & Auth)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.auth)
 
     // Coil Image Loading
     implementation(libs.coil.compose)

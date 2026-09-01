@@ -10,6 +10,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -50,10 +52,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings & AI Config", fontWeight = FontWeight.Bold) },
+                title = { Text("Einstellungen & AI-Konfiguration", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 }
             )
@@ -88,7 +90,7 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Google AI Pro vs. API Key",
+                            text = "Google AI Pro vs. API-Schlüssel",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -96,14 +98,14 @@ fun SettingsScreen(
                     }
 
                     Text(
-                        text = "Consumer subscriptions (Google AI Pro / Google One AI Premium) give you access to Gemini Advanced in the consumer web & mobile apps, but do not provide direct developer API keys for custom apps.",
+                        text = "Endkunden-Abonnements (Google AI Pro / Google One AI Premium) bieten Zugriff auf Gemini Advanced in den normalen Apps, beinhalten jedoch keine Entwickler-API-Schlüssel für Drittanbieter-Apps.",
                         style = MaterialTheme.typography.bodyMedium,
                         lineHeight = 20.sp,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
 
                     Text(
-                        text = "To scan drinks in PicScan, you can get a FREE Gemini API key from Google AI Studio in just seconds. The free tier gives plenty of scans per minute!",
+                        text = "Um Getränke in lecker Bierchen! zu scannen, kannst du dir in wenigen Sekunden einen KOSTENLOSEN Gemini-API-Schlüssel im Google AI Studio erstellen. Das Kontingent ist für private Scans völlig ausreichend!",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 20.sp,
@@ -118,9 +120,9 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Get Free API Key from Google AI Studio")
+                        Text("Kostenlosen API-Schlüssel im Google AI Studio holen")
                     }
                 }
             }
@@ -146,7 +148,7 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Gemini API Key",
+                            text = "Gemini-API-Schlüssel",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -159,7 +161,7 @@ fun SettingsScreen(
                             saveFeedbackMessage = null
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("API Key (e.g. AIzaSy...)") },
+                        label = { Text("API-Schlüssel (z. B. AIzaSy...)") },
                         singleLine = true,
                         visualTransformation = if (isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
@@ -167,12 +169,12 @@ fun SettingsScreen(
                                 IconButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
                                     Icon(
                                         imageVector = if (isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                        contentDescription = "Toggle Visibility"
+                                        contentDescription = "Sichtbarkeit umschalten"
                                     )
                                 }
                                 if (apiKeyInput.isNotEmpty()) {
                                     IconButton(onClick = { apiKeyInput = "" }) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
+                                        Icon(Icons.Default.Clear, contentDescription = "Leeren")
                                     }
                                 }
                             }
@@ -197,21 +199,21 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.ContentPaste, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Paste")
+                            Text("Einfügen")
                         }
 
                         Button(
                             onClick = {
                                 viewModel.saveApiKey(apiKeyInput)
                                 focusManager.clearFocus()
-                                saveFeedbackMessage = "API Key saved successfully!"
+                                saveFeedbackMessage = "API-Schlüssel erfolgreich gespeichert!"
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save Key")
+                            Text("Speichern")
                         }
                     }
 
@@ -247,14 +249,14 @@ fun SettingsScreen(
                             tint = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "AI Model Engine",
+                            text = "AI-Modell-Engine",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                     }
 
                     Text(
-                        text = "Choose which Gemini model processes your drink scans:",
+                        text = "Wähle das Gemini-Modell für deine Getränke-Scans aus:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -293,9 +295,9 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text("PicScan - AI Drink Scanner", fontWeight = FontWeight.Bold)
-                    Text("Version 1.0.0 (Target Android 17 / API 35+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Powered by Google Gemini Vision & CameraX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Text("lecker Bierchen! – AI Getränke- & Bier-Scanner", fontWeight = FontWeight.Bold)
+                    Text("Version 1.0.0 (Entwickelt für Android 17 / API 35+)", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Unterstützt von Google Gemini Vision & CameraX", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }

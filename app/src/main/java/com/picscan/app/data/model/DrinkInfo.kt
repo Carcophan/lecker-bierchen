@@ -45,7 +45,7 @@ enum class BeerVerdict(
     @SerialName("PISSBRUEHE")
     PISSBRUEHE(
         title = "PISSBRÜHE!",
-        emoji = "🤢🚽",
+        emoji = "☣️🤢",
         tierNumber = 5,
         subtitle = "Absoluter Notstand – wässrige, untrinkbare Plörre"
     ),
@@ -62,7 +62,7 @@ enum class BeerVerdict(
 @Serializable
 data class DrinkDetails(
     val name: String,
-    val category: String = "Beverage",
+    val category: String = "Getränk",
     val brandOrProducer: String? = null,
     val origin: String? = null,
     val abvOrCaffeine: String? = null,
@@ -86,6 +86,7 @@ data class DrinkDetails(
 
         val allText = listOfNotNull(name, category, brandOrProducer, description).joinToString(" ").lowercase()
         val isBeer = category.contains("Beer", ignoreCase = true) ||
+                category.contains("Bier", ignoreCase = true) ||
                 category.contains("Ale", ignoreCase = true) ||
                 category.contains("IPA", ignoreCase = true) ||
                 category.contains("Pils", ignoreCase = true) ||
@@ -94,7 +95,6 @@ data class DrinkDetails(
                 category.contains("Helles", ignoreCase = true) ||
                 category.contains("Stout", ignoreCase = true) ||
                 category.contains("Kölsch", ignoreCase = true) ||
-                category.contains("Bier", ignoreCase = true) ||
                 category.contains("Porter", ignoreCase = true) ||
                 category.contains("Gose", ignoreCase = true) ||
                 category.contains("Bock", ignoreCase = true) ||
@@ -182,23 +182,23 @@ data class FlavorProfile(
     val sweetnessLevel: Int = 3, // 1 to 5
     val bitternessLevel: Int = 3, // 1 to 5
     val acidityLevel: Int = 3, // 1 to 5
-    val body: String = "Medium", // Light, Medium, Full
+    val body: String = "Mittel", // Leicht, Mittel, Vollmundig
     val aromas: List<String> = emptyList(),
     val tastingNotes: List<String> = emptyList()
 )
 
 @Serializable
 data class NutritionalInfo(
-    val estimatedCalories: String = "N/A",
-    val estimatedSugar: String = "N/A",
-    val estimatedCarbs: String = "N/A",
-    val dietaryHighlights: List<String> = emptyList() // e.g. "Gluten-Free", "Vegan", "Zero Sugar", "Organic"
+    val estimatedCalories: String = "Keine Angabe",
+    val estimatedSugar: String = "Keine Angabe",
+    val estimatedCarbs: String = "Keine Angabe",
+    val dietaryHighlights: List<String> = emptyList() // z. B. "Glutenfrei", "Vegan", "Zuckerfrei", "Bio"
 )
 
 @Serializable
 data class ServingRecommendation(
-    val idealTemperature: String = "Chilled (4-7°C / 40-45°F)",
-    val glassware: String = "Standard Glass",
+    val idealTemperature: String = "Gekühlt (4-7 °C)",
+    val glassware: String = "Standardglas",
     val foodPairings: List<String> = emptyList(),
     val mixologyTipOrCocktail: String? = null
 )

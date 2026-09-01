@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -117,20 +118,20 @@ fun CameraScanScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Camera Permission Required",
+                        text = "Kamera-Berechtigung erforderlich",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "PicScan needs camera access to scan and identify drink labels, cans, and bottles.",
+                        text = "lecker Bierchen! benötigt Zugriff auf die Kamera, um Getränkeetiketten, Dosen und Flaschen zu scannen und zu erkennen.",
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text("Grant Camera Permission")
+                        Text("Kamera-Berechtigung erteilen")
                     }
                 }
             }
@@ -153,7 +154,7 @@ fun CameraScanScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.History,
-                    contentDescription = "Scan History",
+                    contentDescription = "Scan-Verlauf",
                     tint = Color.White
                 )
             }
@@ -169,13 +170,13 @@ fun CameraScanScreen(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.LocalBar,
+                        imageVector = Icons.Default.SportsBar,
                         contentDescription = null,
                         tint = Color(0xFFFF9800),
                         modifier = Modifier.size(18.dp)
                     )
                     Text(
-                        text = "PicScan AI",
+                        text = "lecker Bierchen!",
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
@@ -194,7 +195,7 @@ fun CameraScanScreen(
                 ) {
                     Icon(
                         imageVector = if (uiState.isFlashOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                        contentDescription = "Toggle Flash",
+                        contentDescription = "Blitz umschalten",
                         tint = Color.White
                     )
                 }
@@ -205,7 +206,7 @@ fun CameraScanScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Settings",
+                        contentDescription = "Einstellungen",
                         tint = Color.White
                     )
                 }
@@ -235,19 +236,19 @@ fun CameraScanScreen(
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Gemini API Key Required",
+                            text = "Gemini-API-Schlüssel erforderlich",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                         Text(
-                            text = "Tap here to configure your Google AI key.",
+                            text = "Tippe hier, um deinen Google AI Schlüssel einzurichten.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
                     Icon(
-                        imageVector = Icons.Default.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -278,7 +279,7 @@ fun CameraScanScreen(
                     IconButton(onClick = { viewModel.clearError() }) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss",
+                            contentDescription = "Schließen",
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
                     }
@@ -295,7 +296,7 @@ fun CameraScanScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Point camera at any drink bottle, can, or glass",
+                text = "Kamera auf Flasche, Dose oder Glas richten",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.85f),
                 modifier = Modifier
@@ -319,7 +320,7 @@ fun CameraScanScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = "Pick Image",
+                        contentDescription = "Bild aus Galerie wählen",
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
                     )
@@ -362,7 +363,7 @@ fun CameraScanScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.FlipCameraAndroid,
-                        contentDescription = "Switch Camera",
+                        contentDescription = "Kamera wechseln",
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
                     )
@@ -397,13 +398,13 @@ fun CameraScanScreen(
                             strokeWidth = 4.dp
                         )
                         Text(
-                            text = "Analyzing Drink with Google AI…",
+                            text = "Getränk wird mit Google AI analysiert…",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            text = "Identifying beverage, flavors, nutrition, and tasting profile",
+                            text = "Erkenne Getränk, Aromen, Nährwerte und Geschmacksprofil…",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center

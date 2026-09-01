@@ -78,7 +78,7 @@ class ScannerViewModel(
 
         if (currentApiKey.isBlank()) {
             _uiState.value = _uiState.value.copy(
-                errorMessage = "Please enter your Gemini API Key in Settings to scan drinks."
+                errorMessage = "Bitte gib deinen Gemini-API-Schlüssel in den Einstellungen ein, um Getränke zu scannen."
             )
             return
         }
@@ -110,7 +110,7 @@ class ScannerViewModel(
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
                     isAnalyzing = false,
-                    errorMessage = error.localizedMessage ?: "Failed to analyze drink with Gemini AI."
+                    errorMessage = error.localizedMessage ?: "Getränkeanalyse mit Gemini AI fehlgeschlagen."
                 )
             }
         }

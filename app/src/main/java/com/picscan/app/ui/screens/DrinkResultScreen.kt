@@ -47,10 +47,10 @@ fun DrinkResultScreen(
     if (drink == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("No drink data available", style = MaterialTheme.typography.titleMedium)
+                Text("Keine Getränkedaten verfügbar", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = onNavigateBack) {
-                    Text("Go Back")
+                    Text("Zurück")
                 }
             }
         }
@@ -72,10 +72,10 @@ fun DrinkResultScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Drink Profile", fontWeight = FontWeight.Bold) },
+                title = { Text("Getränkeprofil", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
@@ -83,27 +83,27 @@ fun DrinkResultScreen(
                         val shareText = buildString {
                             appendLine("🍹 ${drink.name}")
                             if (beerVerdict != BeerVerdict.NONE) {
-                                appendLine("Beer Ranking: ${beerVerdict.emoji} ${beerVerdict.title}")
+                                appendLine("Bier-Bewertung: ${beerVerdict.emoji} ${beerVerdict.title}")
                             }
-                            if (!drink.brandOrProducer.isNullOrBlank()) appendLine("Brand: ${drink.brandOrProducer}")
-                            if (!drink.abvOrCaffeine.isNullOrBlank()) appendLine("ABV / Caffeine: ${drink.abvOrCaffeine}")
+                            if (!drink.brandOrProducer.isNullOrBlank()) appendLine("Marke / Brauerei: ${drink.brandOrProducer}")
+                            if (!drink.abvOrCaffeine.isNullOrBlank()) appendLine("Alkohol / Koffein: ${drink.abvOrCaffeine}")
                             appendLine("\n${drink.description}")
                             if (drink.flavorProfile.tastingNotes.isNotEmpty()) {
-                                appendLine("\nTasting Notes: ${drink.flavorProfile.tastingNotes.joinToString(", ")}")
+                                appendLine("\nGeschmacksnoten: ${drink.flavorProfile.tastingNotes.joinToString(", ")}")
                             }
                             if (drink.servingRecommendations.foodPairings.isNotEmpty()) {
-                                appendLine("\nFood Pairings: ${drink.servingRecommendations.foodPairings.joinToString(", ")}")
+                                appendLine("\nSpeisenbegleiter: ${drink.servingRecommendations.foodPairings.joinToString(", ")}")
                             }
-                            appendLine("\nScanned with PicScan AI")
+                            appendLine("\nGescannt mit lecker Bierchen! AI")
                         }
                         val sendIntent = Intent().apply {
                             action = Intent.ACTION_SEND
                             putExtra(Intent.EXTRA_TEXT, shareText)
                             type = "text/plain"
                         }
-                        context.startActivity(Intent.createChooser(sendIntent, "Share Drink Info"))
+                        context.startActivity(Intent.createChooser(sendIntent, "Getränke-Info teilen"))
                     }) {
-                        Icon(Icons.Default.Share, contentDescription = "Share")
+                        Icon(Icons.Default.Share, contentDescription = "Teilen")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -130,7 +130,7 @@ fun DrinkResultScreen(
                     ) {
                         Icon(Icons.Default.CameraAlt, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Scan Another Drink", fontWeight = FontWeight.Bold)
+                        Text("Neues Getränk scannen", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -156,14 +156,14 @@ fun DrinkResultScreen(
                 if (uiState.currentImageBitmap != null) {
                     Image(
                         bitmap = uiState.currentImageBitmap!!.asImageBitmap(),
-                        contentDescription = "Drink Photo",
+                        contentDescription = "Getränkefoto",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
                 } else if (uiState.currentImagePath != null) {
                     AsyncImage(
                         model = File(uiState.currentImagePath!!),
-                        contentDescription = "Drink Photo",
+                        contentDescription = "Getränkefoto",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -177,7 +177,7 @@ fun DrinkResultScreen(
                 }
             }
 
-            // Beer Verdict Feature Banner (Flashing / Animated 5-Tier Beer Ranking)
+            // Beer Verdict Feature Banner (5-Tier Beer Ranking)
             if (beerVerdict != BeerVerdict.NONE) {
                 BeerVerdictCard(
                     drink = drink,
@@ -214,7 +214,7 @@ fun DrinkResultScreen(
                 if (!drink.abvOrCaffeine.isNullOrBlank()) {
                     InfoChip(
                         icon = Icons.Default.LocalBar,
-                        title = "Strength",
+                        title = "Stärke",
                         value = drink.abvOrCaffeine,
                         modifier = Modifier.weight(1f)
                     )
@@ -222,7 +222,7 @@ fun DrinkResultScreen(
 
                 InfoChip(
                     icon = Icons.Default.Speed,
-                    title = "Body",
+                    title = "Körper",
                     value = drink.flavorProfile.body,
                     modifier = Modifier.weight(1f)
                 )
@@ -247,7 +247,7 @@ fun DrinkResultScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Sommelier Overview",
+                            text = "Sommelier-Übersicht",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -280,7 +280,7 @@ fun DrinkResultScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Flavor Profile",
+                            text = "Geschmacksprofil",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -291,9 +291,9 @@ fun DrinkResultScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        LevelIndicator(label = "Sweetness", level = drink.flavorProfile.sweetnessLevel)
-                        LevelIndicator(label = "Bitterness", level = drink.flavorProfile.bitternessLevel)
-                        LevelIndicator(label = "Acidity", level = drink.flavorProfile.acidityLevel)
+                        LevelIndicator(label = "Süße", level = drink.flavorProfile.sweetnessLevel)
+                        LevelIndicator(label = "Bitterkeit", level = drink.flavorProfile.bitternessLevel)
+                        LevelIndicator(label = "Säure", level = drink.flavorProfile.acidityLevel)
                     }
 
                     // Aromas
@@ -320,7 +320,7 @@ fun DrinkResultScreen(
                     if (drink.flavorProfile.tastingNotes.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "Tasting Notes",
+                                text = "Geschmacksnoten",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,7 +357,7 @@ fun DrinkResultScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Serving & Pairings",
+                            text = "Servier- & Speiseempfehlungen",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -366,13 +366,13 @@ fun DrinkResultScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         InfoChip(
                             icon = Icons.Default.Thermostat,
-                            title = "Ideal Temp",
+                            title = "Ideale Temp.",
                             value = drink.servingRecommendations.idealTemperature,
                             modifier = Modifier.weight(1f)
                         )
                         InfoChip(
                             icon = Icons.Default.WineBar,
-                            title = "Glassware",
+                            title = "Glas",
                             value = drink.servingRecommendations.glassware,
                             modifier = Modifier.weight(1f)
                         )
@@ -381,7 +381,7 @@ fun DrinkResultScreen(
                     if (drink.servingRecommendations.foodPairings.isNotEmpty()) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(
-                                text = "Recommended Food Pairings:",
+                                text = "Empfohlene Speisenbegleiter:",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -449,7 +449,7 @@ fun DrinkResultScreen(
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
-                            text = "Estimated Nutrition",
+                            text = "Geschätzte Nährwerte",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -460,15 +460,15 @@ fun DrinkResultScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Calories", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Kalorien", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(drink.nutrition.estimatedCalories, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                         Column {
-                            Text("Sugar", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Zucker", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(drink.nutrition.estimatedSugar, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                         Column {
-                            Text("Carbohydrates", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Kohlenhydrate", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(drink.nutrition.estimatedCarbs, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -506,7 +506,7 @@ fun DrinkResultScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Did You Know?",
+                                text = "Schon gewusst?",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )

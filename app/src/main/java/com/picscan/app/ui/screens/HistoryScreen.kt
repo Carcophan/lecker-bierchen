@@ -52,16 +52,16 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Scan History", fontWeight = FontWeight.Bold) },
+                title = { Text("Scan-Verlauf", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
                     }
                 },
                 actions = {
                     if (historyList.isNotEmpty()) {
                         IconButton(onClick = { showClearConfirmation = true }) {
-                            Icon(Icons.Default.DeleteSweep, contentDescription = "Clear History")
+                            Icon(Icons.Default.DeleteSweep, contentDescription = "Verlauf leeren")
                         }
                     }
                 }
@@ -81,12 +81,12 @@ fun HistoryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
-                placeholder = { Text("Search your scanned drinks…") },
+                placeholder = { Text("Gescannte Getränke durchsuchen…") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear")
+                            Icon(Icons.Default.Close, contentDescription = "Löschen")
                         }
                     }
                 },
@@ -110,13 +110,13 @@ fun HistoryScreen(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (searchQuery.isBlank()) "No scans yet" else "No matching drinks found",
+                            text = if (searchQuery.isBlank()) "Noch keine Scans vorhanden" else "Keine passenden Getränke gefunden",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (searchQuery.isBlank()) "Point your camera at any drink to get started!" else "Try a different search term.",
+                            text = if (searchQuery.isBlank()) "Richte deine Kamera auf ein Getränk, um loszulegen!" else "Versuche einen anderen Suchbegriff.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -146,8 +146,8 @@ fun HistoryScreen(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("Clear All History?") },
-            text = { Text("This will permanently remove all previously scanned drinks.") },
+            title = { Text("Gesamten Verlauf leeren?") },
+            text = { Text("Dadurch werden alle zuvor gescannten Getränke unwiderruflich gelöscht.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -155,12 +155,12 @@ fun HistoryScreen(
                         showClearConfirmation = false
                     }
                 ) {
-                    Text("Clear All", color = MaterialTheme.colorScheme.error)
+                    Text("Alles löschen", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearConfirmation = false }) {
-                    Text("Cancel")
+                    Text("Abbrechen")
                 }
             }
         )
@@ -173,7 +173,7 @@ fun HistoryCard(
     onClick: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy • HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy • HH:mm", Locale.GERMANY) }
     val formattedDate = remember(item.timestamp) { dateFormat.format(Date(item.timestamp)) }
 
     Card(
@@ -201,7 +201,7 @@ fun HistoryCard(
                 if (item.imagePath != null && File(item.imagePath).exists()) {
                     AsyncImage(
                         model = File(item.imagePath),
-                        contentDescription = "Drink Thumbnail",
+                        contentDescription = "Getränk Vorschaubild",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -235,7 +235,7 @@ fun HistoryCard(
             IconButton(onClick = onDelete) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
-                    contentDescription = "Delete",
+                    contentDescription = "Löschen",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

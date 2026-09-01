@@ -103,7 +103,7 @@ private fun getVisualConfig(verdict: BeerVerdict): VerdictVisualConfig {
             tierLabel = "Rang 5/5 • Untrinkbare Plörre",
             leftEmoji = "☣️",
             rightEmoji = "🤢",
-            bannerEmojis = "☣️ 🤢 🚽 ⚠️ ❌"
+            bannerEmojis = "☣️ 🤢 🝽 ⚠️ ❌"
         )
         BeerVerdict.NONE -> VerdictVisualConfig(
             primaryColor = Color.Gray,
@@ -121,6 +121,7 @@ private fun getVisualConfig(verdict: BeerVerdict): VerdictVisualConfig {
 
 /**
  * Animated Celebration or Warning Banner displayed directly on DrinkResultScreen for the 5-Tier Beer Ranking.
+ * Tuned for subtle, pleasant and non-intrusive motion.
  */
 @Composable
 fun BeerVerdictCard(
@@ -134,21 +135,21 @@ fun BeerVerdictCard(
     val context = LocalContext.current
     val config = remember(verdict) { getVisualConfig(verdict) }
 
-    // Infinite pulsing animation
+    // Subtle ambient breathing animation
     val infiniteTransition = rememberInfiniteTransition(label = "beerVerdictTransition")
     
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.98f,
-        targetValue = 1.03f,
+        initialValue = 0.995f,
+        targetValue = 1.008f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 450
-                    BeerVerdict.LECKER_BIERCHEN -> 700
-                    BeerVerdict.WEGBIER -> 850
-                    BeerVerdict.PENNERGLUECK -> 600
-                    BeerVerdict.PISSBRUEHE -> 350
-                    BeerVerdict.NONE -> 1000
+                    BeerVerdict.HOPFENBOMBE -> 1500
+                    BeerVerdict.LECKER_BIERCHEN -> 1800
+                    BeerVerdict.WEGBIER -> 2000
+                    BeerVerdict.PENNERGLUECK -> 1700
+                    BeerVerdict.PISSBRUEHE -> 1400
+                    BeerVerdict.NONE -> 2000
                 },
                 easing = FastOutSlowInEasing
             ),
@@ -158,16 +159,16 @@ fun BeerVerdictCard(
     )
 
     val flashAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
+        initialValue = 0.85f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 350
-                    BeerVerdict.PISSBRUEHE -> 250
-                    else -> 600
+                    BeerVerdict.HOPFENBOMBE -> 1600
+                    BeerVerdict.PISSBRUEHE -> 1400
+                    else -> 2000
                 },
-                easing = LinearEasing
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
@@ -175,10 +176,10 @@ fun BeerVerdictCard(
     )
 
     val shakeOffset by infiniteTransition.animateFloat(
-        initialValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) -3f else 0f,
-        targetValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) 3f else 0f,
+        initialValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) -0.8f else 0f,
+        targetValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) 0.8f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(90, easing = LinearEasing),
+            animation = tween(700, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "shakeOffset"
@@ -207,9 +208,9 @@ fun BeerVerdictCard(
         ),
         border = CardDefaults.outlinedCardBorder().copy(
             brush = cardBrush,
-            width = 2.5.dp
+            width = 2.dp
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -304,7 +305,7 @@ fun BeerVerdictCard(
 }
 
 /**
- * Fullscreen Interactive Alerting Flashing Modal with Sound & Particles for 5-Tier Beer Ranking.
+ * Fullscreen Interactive Dialog with gentle atmospheric animations for 5-Tier Beer Ranking.
  */
 @Composable
 fun BeerVerdictCelebrationDialog(
@@ -324,18 +325,18 @@ fun BeerVerdictCelebrationDialog(
 
     val infiniteTransition = rememberInfiniteTransition(label = "fullscreenBeerAlert")
 
-    // Flashing strobe background
+    // Gentle atmospheric background glow
     val strobeColor1 by infiniteTransition.animateColor(
-        initialValue = config.primaryColor.copy(alpha = 0.92f),
-        targetValue = config.secondaryColor.copy(alpha = 0.92f),
+        initialValue = config.primaryColor.copy(alpha = 0.70f),
+        targetValue = config.secondaryColor.copy(alpha = 0.70f),
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 250
-                    BeerVerdict.PISSBRUEHE -> 200
-                    else -> 400
+                    BeerVerdict.HOPFENBOMBE -> 1600
+                    BeerVerdict.PISSBRUEHE -> 1500
+                    else -> 2200
                 },
-                easing = LinearEasing
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
@@ -343,32 +344,32 @@ fun BeerVerdictCelebrationDialog(
     )
 
     val strobeColor2 by infiniteTransition.animateColor(
-        initialValue = Color.Black.copy(alpha = 0.98f),
-        targetValue = config.containerBgColor.copy(alpha = 0.98f),
+        initialValue = Color.Black.copy(alpha = 0.95f),
+        targetValue = config.containerBgColor.copy(alpha = 0.95f),
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 250
-                    BeerVerdict.PISSBRUEHE -> 200
-                    else -> 400
+                    BeerVerdict.HOPFENBOMBE -> 1600
+                    BeerVerdict.PISSBRUEHE -> 1500
+                    else -> 2200
                 },
-                easing = LinearEasing
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
         label = "strobeColor2"
     )
 
-    // Pulsing and Wobble
+    // Subtle gentle breathing pulse
     val scalePulse by infiniteTransition.animateFloat(
-        initialValue = 0.93f,
-        targetValue = 1.09f,
+        initialValue = 0.985f,
+        targetValue = 1.015f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 350
-                    BeerVerdict.PISSBRUEHE -> 260
-                    else -> 500
+                    BeerVerdict.HOPFENBOMBE -> 1600
+                    BeerVerdict.PISSBRUEHE -> 1400
+                    else -> 2000
                 },
                 easing = FastOutSlowInEasing
             ),
@@ -377,27 +378,28 @@ fun BeerVerdictCelebrationDialog(
         label = "scalePulse"
     )
 
+    // Subtle gentle wobble tilt
     val rotationWobble by infiniteTransition.animateFloat(
         initialValue = when (verdict) {
-            BeerVerdict.HOPFENBOMBE -> -8f
-            BeerVerdict.PISSBRUEHE -> -12f
-            BeerVerdict.PENNERGLUECK -> -7f
-            else -> -4f
+            BeerVerdict.PISSBRUEHE -> -1.5f
+            BeerVerdict.HOPFENBOMBE -> -1.2f
+            BeerVerdict.PENNERGLUECK -> -1.0f
+            else -> -0.6f
         },
         targetValue = when (verdict) {
-            BeerVerdict.HOPFENBOMBE -> 8f
-            BeerVerdict.PISSBRUEHE -> 12f
-            BeerVerdict.PENNERGLUECK -> 7f
-            else -> 4f
+            BeerVerdict.PISSBRUEHE -> 1.5f
+            BeerVerdict.HOPFENBOMBE -> 1.2f
+            BeerVerdict.PENNERGLUECK -> 1.0f
+            else -> 0.6f
         },
         animationSpec = infiniteRepeatable(
             animation = tween(
                 when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 180
-                    BeerVerdict.PISSBRUEHE -> 120
-                    else -> 600
+                    BeerVerdict.HOPFENBOMBE -> 1400
+                    BeerVerdict.PISSBRUEHE -> 1200
+                    else -> 1800
                 },
-                easing = LinearEasing
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
@@ -405,10 +407,10 @@ fun BeerVerdictCelebrationDialog(
     )
 
     val shakeX by infiniteTransition.animateFloat(
-        initialValue = if (verdict == BeerVerdict.PISSBRUEHE) -14f else 0f,
-        targetValue = if (verdict == BeerVerdict.PISSBRUEHE) 14f else 0f,
+        initialValue = if (verdict == BeerVerdict.PISSBRUEHE) -1.2f else 0f,
+        targetValue = if (verdict == BeerVerdict.PISSBRUEHE) 1.2f else 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(60, easing = LinearEasing),
+            animation = tween(600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "shakeX"
@@ -447,9 +449,9 @@ fun BeerVerdictCelebrationDialog(
                     .clip(RoundedCornerShape(28.dp))
                     .background(Color.Black.copy(alpha = 0.90f))
                     .border(
-                        width = 4.dp,
+                        width = 2.5.dp,
                         brush = Brush.linearGradient(
-                            listOf(Color.White, config.primaryColor, config.secondaryColor, Color.White)
+                            listOf(Color.White.copy(alpha = 0.8f), config.primaryColor, config.secondaryColor, Color.White.copy(alpha = 0.8f))
                         ),
                         shape = RoundedCornerShape(28.dp)
                     )
@@ -474,17 +476,17 @@ fun BeerVerdictCelebrationDialog(
                 // Header icons
                 Text(
                     text = config.bannerEmojis,
-                    fontSize = 26.sp
+                    fontSize = 24.sp
                 )
 
-                // Flashing Title
+                // Title
                 Text(
                     text = verdict.title,
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Black,
                     color = config.textColor,
                     textAlign = TextAlign.Center,
-                    letterSpacing = 2.sp
+                    letterSpacing = 1.5.sp
                 )
 
                 // Drink Name
@@ -556,12 +558,12 @@ fun BeerVerdictCelebrationDialog(
 private fun VerdictFloatingParticles(verdict: BeerVerdict) {
     val infiniteTransition = rememberInfiniteTransition(label = "verdictParticles")
     val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 0.95f,
+        initialValue = 0.35f,
+        targetValue = 0.75f,
         animationSpec = infiniteRepeatable(
             animation = tween(
-                if (verdict == BeerVerdict.HOPFENBOMBE || verdict == BeerVerdict.PISSBRUEHE) 300 else 750,
-                easing = LinearEasing
+                if (verdict == BeerVerdict.HOPFENBOMBE || verdict == BeerVerdict.PISSBRUEHE) 1600 else 2200,
+                easing = FastOutSlowInEasing
             ),
             repeatMode = RepeatMode.Reverse
         ),
@@ -574,19 +576,19 @@ private fun VerdictFloatingParticles(verdict: BeerVerdict) {
             BeerVerdict.LECKER_BIERCHEN -> listOf("🍻", "✨", "🍺", "👑", "⭐", "🎉")
             BeerVerdict.WEGBIER -> listOf("🚶‍♂️", "🍺", "👟", "🏙️", "🎶", "🌿")
             BeerVerdict.PENNERGLUECK -> listOf("🥫", "🥴", "🪙", "🛒", "💨", "🍺")
-            BeerVerdict.PISSBRUEHE -> listOf("☣️", "🤢", "🚽", "⚠️", "❌", "🤮")
+            BeerVerdict.PISSBRUEHE -> listOf("☣️", "🤢", "🝽", "⚠️", "❌", "🤮")
             BeerVerdict.NONE -> emptyList()
         }
     }
 
     if (particles.size >= 6) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Text(particles[0], fontSize = 38.sp, modifier = Modifier.align(Alignment.TopStart).padding(30.dp).scale(alpha))
-            Text(particles[1], fontSize = 42.sp, modifier = Modifier.align(Alignment.TopEnd).padding(40.dp).scale(alpha))
-            Text(particles[2], fontSize = 36.sp, modifier = Modifier.align(Alignment.BottomStart).padding(50.dp).scale(alpha))
-            Text(particles[3], fontSize = 44.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(30.dp).scale(alpha))
-            Text(particles[4], fontSize = 34.sp, modifier = Modifier.align(Alignment.CenterStart).padding(20.dp).scale(alpha))
-            Text(particles[5], fontSize = 34.sp, modifier = Modifier.align(Alignment.CenterEnd).padding(20.dp).scale(alpha))
+            Text(particles[0], fontSize = 28.sp, modifier = Modifier.align(Alignment.TopStart).padding(30.dp).scale(0.9f + alpha * 0.15f))
+            Text(particles[1], fontSize = 30.sp, modifier = Modifier.align(Alignment.TopEnd).padding(40.dp).scale(0.9f + alpha * 0.15f))
+            Text(particles[2], fontSize = 26.sp, modifier = Modifier.align(Alignment.BottomStart).padding(50.dp).scale(0.9f + alpha * 0.15f))
+            Text(particles[3], fontSize = 30.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(30.dp).scale(0.9f + alpha * 0.15f))
+            Text(particles[4], fontSize = 24.sp, modifier = Modifier.align(Alignment.CenterStart).padding(20.dp).scale(0.9f + alpha * 0.15f))
+            Text(particles[5], fontSize = 24.sp, modifier = Modifier.align(Alignment.CenterEnd).padding(20.dp).scale(0.9f + alpha * 0.15f))
         }
     }
 }

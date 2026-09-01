@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">PicScan</string>
-    <string name="scan_title">Drink Scanner</string>
-    <string name="history_title">Scan History</string>
-    <string name="settings_title">Settings &amp; AI Config</string>
+    <string name="app_name">lecker Bierchen!</string>
+    <string name="scan_title">Getränke- &amp; Bier-Scanner</string>
+    <string name="history_title">Scan-Verlauf</string>
+    <string name="settings_title">Einstellungen &amp; AI-Konfiguration</string>
 </resources>

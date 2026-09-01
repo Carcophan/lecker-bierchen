@@ -28,7 +28,7 @@ class GeminiDrinkScannerRepository {
     ): Result<DrinkDetails> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(
-                IllegalStateException("Gemini API key is missing. Please set your API key in Settings.")
+                IllegalStateException("Gemini-API-Schlüssel fehlt. Bitte trage deinen API-Schlüssel in den Einstellungen ein.")
             )
         }
 
@@ -41,59 +41,63 @@ class GeminiDrinkScannerRepository {
             val scaledBitmap = ImageUtils.scaleBitmapDown(bitmap)
 
             val promptText = """
-                You are a world-class sommelier, barista, mixologist, and beer connoisseur.
-                Analyze the drink, bottle, can, cup, or beverage label in this image.
+                Du bist ein weltklasse Sommelier, Barista, Mixologe und Bier-Kenner.
+                Analysiere das Getränk, die Flasche, Dose, das Glas oder Etikett auf diesem Bild.
                 
-                BEER RATING INSTRUCTION (5-Tier Ranking Feature):
-                If the beverage in the image is a BEER (or cider/malt beverage), evaluate and classify it into exactly one of these 5 tiers:
-                1. "HOPFENBOMBE": Tier 1 (Supreme / Masterpiece). Intense hop-forward craft beers, Double/Triple IPAs, Imperial Stouts, high-end microbrew creations, Trappist/monastery masterpieces, specialty dry-hopped brews (e.g. BrewDog Punk IPA, Tree House, Pliny, Westvleteren, Sierra Nevada Torpedo, specialty craft breweries).
-                2. "LECKER_BIERCHEN": Tier 2 (Top Quality / Mass Favorite). High quality, delicious traditional, Bavarian, Belgian, Czech, or German quality beers (e.g. Augustiner, Paulaner, Tegernseer, Weihenstephaner, Erdinger, Rothaus Tannenzäpfle, Chiemseer, Bayreuther, Guinness, Stella Artois, Pilsner Urquell, Duvel, Leffe, Ayinger).
-                3. "WEGBIER": Tier 3 (Solid Kiosk / Späti Companion). Classic, solid, crisp everyday lager/pilsner, ubiquitous kiosk/späti favorites, festival session beers (e.g. Astra, Sternburg, Krombacher, Bitburger, Beck's, Jever, Warsteiner, Veltins, Heineken, Flensburger, Berliner Kindl, Stauder).
-                4. "PENNERGLUECK": Tier 4 (Discount Dosenbier / Budget Cult). Cheap discount supermarket can beers, budget-friendly penny-pinchers (e.g. Oettinger, 5,0 Original, Hansa Pils, Paderborner, Karlskrone, Turmbräu, Schultenbräu, Adelskronen, Meisterbräu).
-                5. "PISSBRUEHE": Tier 5 (Untrinkable Swill / Foul Plörre). Watered-down plörre, notoriously bad discount swill, spoiled/flat beer, or universally mocked cheap swill (e.g. Perlenbacher, Natty Light / Natural Light, Keystone Light, Milwaukee's Best, foul/flat beer).
+                SPRACHVORGABE (SEHR WICHTIG):
+                - ALLE Ausgabetexte, Beschreibungen, Kategorienamen, Nährwertangaben, Aromen, Geschmacksnoten, Speisenempfehlungen und Fakten MÜSSEN VOLLSTÄNDIG AUF DEUTSCH verfasst sein.
                 
-                If the drink is NOT a beer (e.g. wine, coffee, tea, cocktail, soda, juice, water, energy drink, whiskey), set "beerVerdict": "NONE".
+                BIER-BEWERTUNGS-ANWEISUNG (5-Stufen-Ranking):
+                Falls das Getränk auf dem Bild ein BIER (oder Biermischgetränk/Cider) ist, ordne es genau einer dieser 5 Stufen zu:
+                1. "HOPFENBOMBE": Stufe 1 (Meisterwerk / Craft-Explosion). Intensive hopfenbetonte Craft-Biere, Double/Triple IPAs, Imperial Stouts, Trappistenbiere, edle Microbrew-Kreationen (z. B. BrewDog Punk IPA, Tree House, Westvleteren, Sierra Nevada Torpedo, besondere Craft-Brauereien).
+                2. "LECKER_BIERCHEN": Stufe 2 (Hohe Braukunst / Qualitäts-Klassiker). Hervorragende, traditionsreiche bayerische, belgische oder deutsche Traditionsbiere (z. B. Augustiner, Paulaner, Tegernseer, Weihenstephaner, Erdinger, Rothaus Tannenzäpfle, Chiemseer, Bayreuther, Guinness, Pilsner Urquell, Duvel, Leffe, Ayinger).
+                3. "WEGBIER": Stufe 3 (Kiosk- & Späti-Held). Solide, süffige Alltags-Lager/Pilsener, Kiosk- und Festival-Klassiker (z. B. Astra, Sternburg, Krombacher, Bitburger, Beck's, Jever, Warsteiner, Veltins, Heineken, Flensburger, Berliner Kindl, Stauder).
+                4. "PENNERGLUECK": Stufe 4 (Sparfuchs-Dosenkracher). Günstige Discounter-Dosenbiere, Sparfuchs-Kultbiere (z. B. Oettinger, 5,0 Original, Hansa Pils, Paderborner, Karlskrone, Turmbräu, Schultenbräu, Adelskronen, Meisterbräu).
+                5. "PISSBRUEHE": Stufe 5 (Untrinkbare Plörre / Notstand). Wässrige Plörre, berüchtigt schlechtes Billigstbier oder abgestandenes Bier (z. B. Perlenbacher, Natty Light / Natural Light, Keystone Light, schales/abgestandenes Bier).
+                
+                Falls es KEIN Bier ist (z. B. Wein, Kaffee, Tee, Cocktail, Limonade, Saft, Wasser, Energy-Drink, Spirituose), setze "beerVerdict": "NONE" und "beerVerdictReason": null.
 
-                Return a valid, standalone JSON object with the following fields:
+                Gib ein valides, eigenständiges JSON-Objekt mit exakt diesen Feldern auf DEUTSCH zurück:
                 {
-                  "name": "Exact drink name and edition/variant",
-                  "category": "e.g. Red Wine, Craft IPA Beer, Single Origin Espresso, Cocktail, Matcha, Energy Drink, Soda, Sparkling Water, Kombucha, Bourbon",
-                  "brandOrProducer": "Name of brand, brewery, winery, roaster or distiller",
-                  "origin": "Country / Region of origin (e.g. Bordeaux, France or Kyoto, Japan)",
-                  "abvOrCaffeine": "Alcohol by Volume (e.g. '13.5% ABV') or Caffeine content (e.g. '120mg caffeine') or 'Alcohol-Free'",
-                  "description": "Engaging, sensory description of what this drink is, its heritage, and unique qualities (2-3 sentences)",
+                  "name": "Genauer Getränkename und Sorte/Edition",
+                  "category": "z. B. Rotwein, Weißwein, Craft-Bier / IPA, Pils, Helles, Espresso, Cocktail, Matcha, Energy-Drink, Limonade, Mineralwasser, Kombucha, Whiskey, Gin",
+                  "brandOrProducer": "Marke, Brauerei, Weingut, Rösterei oder Destillerie",
+                  "origin": "Herkunftsland / Region (z. B. Bordeaux, Frankreich oder Bayern, Deutschland oder Kyoto, Japan)",
+                  "abvOrCaffeine": "Alkoholgehalt (z. B. '5,2 % vol.') oder Koffeingehalt (z. B. '120 mg Koffein') oder 'Alkoholfrei'",
+                  "description": "Ansprechende, sensorische Beschreibung auf Deutsch über Geschmack, Herkunft und Besonderheiten (2-3 Sätze)",
                   "beerVerdict": "HOPFENBOMBE | LECKER_BIERCHEN | WEGBIER | PENNERGLUECK | PISSBRUEHE | NONE",
-                  "beerVerdictReason": "Short, humorous and punchy reason in German why this beer was awarded this specific tier (or null if NONE)",
+                  "beerVerdictReason": "Kurze, humorvolle und treffende Begründung auf Deutsch für die Einstufung (oder null falls NONE)",
                   "flavorProfile": {
                     "sweetnessLevel": 1-5,
                     "bitternessLevel": 1-5,
                     "acidityLevel": 1-5,
-                    "body": "Light | Medium | Full | Crisp",
-                    "aromas": ["aroma note 1", "aroma note 2", "aroma note 3"],
-                    "tastingNotes": ["taste note 1", "taste note 2", "taste note 3"]
+                    "body": "Leicht | Mittel | Vollmundig | Spritzig",
+                    "aromas": ["Aroma-Note 1 auf Deutsch", "Aroma-Note 2 auf Deutsch", "Aroma-Note 3 auf Deutsch"],
+                    "tastingNotes": ["Geschmacksnote 1 auf Deutsch", "Geschmacksnote 2 auf Deutsch", "Geschmacksnote 3 auf Deutsch"]
                   },
                   "nutrition": {
-                    "estimatedCalories": "e.g. ~140 kcal per 330ml",
-                    "estimatedSugar": "e.g. 0g or 24g",
-                    "estimatedCarbs": "e.g. 3g",
-                    "dietaryHighlights": ["e.g. Sugar Free", "Vegan", "Gluten Free", "Organic", "Zero Calorie"]
+                    "estimatedCalories": "z. B. ~140 kcal pro 330 ml",
+                    "estimatedSugar": "z. B. 0 g oder 24 g",
+                    "estimatedCarbs": "z. B. 3 g",
+                    "dietaryHighlights": ["z. B. Zuckerfrei", "Vegan", "Glutenfrei", "Bio", "Kalorienarm"]
                   },
                   "servingRecommendations": {
-                    "idealTemperature": "e.g. Ice Cold (3-5°C) or Cellar Temp (16-18°C) or Hot (85°C)",
-                    "glassware": "e.g. Tulip Beer Glass, Bordeaux Wine Glass, Highball, Ceramic Mug",
-                    "foodPairings": ["food pairing 1", "food pairing 2", "food pairing 3"],
-                    "mixologyTipOrCocktail": "Optional cocktail recipe or serving garnish recommendation"
+                    "idealTemperature": "z. B. Eiskalt (3-5 °C) oder Gekühlt (6-8 °C) oder Kellertemperatur (14-16 °C) oder Heiß (85 °C)",
+                    "glassware": "z. B. Tulpenglas, Bordeaux-Glas, Highball-Glas, Steingutkrug, Keramiktasse",
+                    "foodPairings": ["Speiseempfehlung 1 auf Deutsch", "Speiseempfehlung 2 auf Deutsch", "Speiseempfehlung 3 auf Deutsch"],
+                    "mixologyTipOrCocktail": "Serviertipp, Garnitur oder Rezeptempfehlung auf Deutsch"
                   },
                   "interestingFacts": [
-                    "Fascinating fact or trivia 1",
-                    "Fascinating fact or trivia 2"
+                    "Spannender Fakt oder Wissenswertes 1 auf Deutsch",
+                    "Spannender Fakt oder Wissenswertes 2 auf Deutsch"
                   ],
                   "isIdentified": true
                 }
 
-                Important: 
-                - Return ONLY the raw JSON object. Do not prefix with markdown explanations.
-                - If the image is not a beverage, drink bottle, can, cup, or glass, set "isIdentified": false and give a helpful note in "description".
+                Wichtig:
+                - Gib AUSSCHLIESSLICH das reine JSON-Objekt ohne umschließenden Text zurück.
+                - Alle Texte, Bezeichnungen und Beschreibungen MÜSSEN in deutscher Sprache sein.
+                - Wenn das Bild kein Getränk zeigt, setze "isIdentified": false und gib einen freundlichen Hinweis auf Deutsch in "description".
             """.trimIndent()
 
             val inputContent = content {
@@ -102,7 +106,7 @@ class GeminiDrinkScannerRepository {
             }
 
             val response = generativeModel.generateContent(inputContent)
-            val responseText = response.text ?: throw IllegalStateException("Empty response received from Gemini AI.")
+            val responseText = response.text ?: throw IllegalStateException("Keine Antwort von Gemini AI erhalten.")
 
             val cleanedJson = extractJsonFromResponse(responseText)
             val drinkDetails = try {
@@ -110,7 +114,7 @@ class GeminiDrinkScannerRepository {
             } catch (e: Exception) {
                 // Fallback to manual parsing / partial structure
                 DrinkDetails(
-                    name = "Scanned Beverage",
+                    name = "Gescanntes Getränk",
                     description = responseText.replace("```json", "").replace("```", "").trim(),
                     isIdentified = true,
                     rawNotes = responseText

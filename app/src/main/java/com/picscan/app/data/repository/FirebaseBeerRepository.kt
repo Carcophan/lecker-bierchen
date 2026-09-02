@@ -55,6 +55,25 @@ class FirebaseBeerRepository(
     private val localCacheFile = File(context.filesDir, "saved_beers_cache.json")
     private val beerImagesDir = File(context.filesDir, "beer_images").apply { mkdirs() }
 
+    private val deletedBeerIds = ConcurrentHashMap.newKeySet<String>().apply {
+        val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+        val saved = prefs.getStringSet("picscan_deleted_beer_ids", null)
+        if (saved != null) addAll(saved)
+    }
+
+    private fun persistDeletedBeerIds() {
+        try {
+            val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putStringSet("picscan_deleted_beer_ids", deletedBeerIds.toSet()).apply()
+        } catch (e: Throwable) {
+            Log.w(tag, "Could not persist deletedBeerIds: ${e.localizedMessage}")
+        }
+    }
+
+    private val collectionDocs = ConcurrentHashMap<String, Map<String, SavedBeerItem>>()
+    private val pendingLocalBeerIds = ConcurrentHashMap.newKeySet<String>()
+    private var hasReceivedAnySnapshot = false
+
     private val _beersFlow = MutableStateFlow<List<SavedBeerItem>>(emptyList())
     val allBeersFlow: Flow<List<SavedBeerItem>> = _beersFlow.asStateFlow()
 
@@ -306,58 +325,55 @@ class FirebaseBeerRepository(
             activeListeners.clear()
         }
 
-        val remoteMap = ConcurrentHashMap<String, SavedBeerItem>()
-
         fun processAndMergeSnapshots() {
-            val currentMap = _beersFlow.value.associateBy { it.id }.toMutableMap()
+            if (!hasReceivedAnySnapshot && collectionDocs.isEmpty()) {
+                _syncState.value = SyncState.Syncing
+                return
+            }
+            hasReceivedAnySnapshot = true
 
-            for ((id, rawRemote) in remoteMap) {
-                // Ensure image from Firestore Base64 is cached locally for fast display
-                val localPath = ensureLocalCachedImage(rawRemote.id, rawRemote.imagePath, rawRemote.imageBase64)
-                val remote = if (localPath != null && localPath != rawRemote.imagePath) {
-                    rawRemote.copy(imagePath = localPath)
-                } else {
-                    rawRemote
-                }
-
-                // Deduplicate by ID or by Name + Brand
-                val existingByKey = currentMap.values.find {
-                    it.id == id || (it.name.equals(remote.name, ignoreCase = true) &&
-                            (it.brandOrProducer.isNullOrBlank() || remote.brandOrProducer.isNullOrBlank() ||
-                                    it.brandOrProducer.equals(remote.brandOrProducer, ignoreCase = true)))
-                }
-
-                if (existingByKey == null) {
-                    currentMap[remote.id] = remote
-                } else {
-                    // Pick the one with higher timestamp or rating/notes, preserving local/remote image data
-                    val chosen = if (remote.timestamp > existingByKey.timestamp ||
-                        (remote.rating > existingByKey.rating) ||
-                        (remote.userNotes.isNotBlank() && existingByKey.userNotes.isBlank())
-                    ) {
-                        remote.copy(
-                            id = existingByKey.id,
-                            rating = if (remote.rating > 0f) remote.rating else existingByKey.rating,
-                            userNotes = if (remote.userNotes.isNotBlank()) remote.userNotes else existingByKey.userNotes,
-                            imagePath = remote.imagePath ?: existingByKey.imagePath,
-                            imageBase64 = remote.imageBase64 ?: existingByKey.imageBase64
-                        )
+            // Gather all documents currently alive in Firestore across all listened collections
+            val allRemote = mutableListOf<SavedBeerItem>()
+            for (docMap in collectionDocs.values) {
+                for ((_, rawRemote) in docMap) {
+                    if (rawRemote.id in deletedBeerIds) continue
+                    val localPath = ensureLocalCachedImage(rawRemote.id, rawRemote.imagePath, rawRemote.imageBase64)
+                    val remote = if (localPath != null && localPath != rawRemote.imagePath) {
+                        rawRemote.copy(imagePath = localPath)
                     } else {
-                        existingByKey.copy(
-                            rating = if (existingByKey.rating > 0f) existingByKey.rating else remote.rating,
-                            userNotes = if (existingByKey.userNotes.isNotBlank()) existingByKey.userNotes else remote.userNotes,
-                            imagePath = existingByKey.imagePath ?: remote.imagePath,
-                            imageBase64 = existingByKey.imageBase64 ?: remote.imageBase64
-                        )
+                        rawRemote
                     }
-                    currentMap[chosen.id] = chosen
+                    allRemote.add(remote)
                 }
             }
 
-            val mergedList = currentMap.values.sortedByDescending { it.timestamp }
+            // Include local beers that are pending initial sync to Firestore
+            val pendingLocals = _beersFlow.value.filter {
+                it.id in pendingLocalBeerIds && it.id !in deletedBeerIds
+            }
+
+            val combined = (allRemote + pendingLocals).filterNot { it.id in deletedBeerIds }
+            val (mergedList, duplicateIds) = deduplicateBeerList(combined)
             _beersFlow.value = mergedList
             persistLocalCache(mergedList)
             _syncState.value = SyncState.Success(mergedList.size)
+
+            if (duplicateIds.isNotEmpty()) {
+                coroutineScope.launch {
+                    val db = firestore ?: return@launch
+                    for (dupId in duplicateIds) {
+                        try {
+                            for (uId in getAllUserIds()) {
+                                db.collection("users").document(uId).collection("beers").document(dupId).delete()
+                                db.collection("users").document(uId).collection("drinks").document(dupId).delete()
+                            }
+                            db.collection("beers").document(dupId).delete()
+                            db.collection("drinks").document(dupId).delete()
+                            Log.d(tag, "Cleaned up redundant duplicate document $dupId from Firestore")
+                        } catch (_: Throwable) {}
+                    }
+                }
+            }
         }
 
         val userIds = getAllUserIds()
@@ -367,19 +383,24 @@ class FirebaseBeerRepository(
             // Listen to users/$uId/beers
             try {
                 val userBeersRef = db.collection("users").document(uId).collection("beers")
+                val key = "user_beers_$uId"
                 val listener = userBeersRef.addSnapshotListener { snapshots, error ->
                     if (error != null) {
                         Log.d(tag, "Listen notice for users/$uId/beers: ${error.localizedMessage}")
                         return@addSnapshotListener
                     }
                     if (snapshots != null) {
+                        val currentInCollection = mutableMapOf<String, SavedBeerItem>()
                         for (doc in snapshots.documents) {
+                            if (doc.id in deletedBeerIds) continue
                             val data = doc.data ?: continue
                             val beer = SavedBeerItem.fromMap(doc.id, data)
-                            if (beer.name.isNotBlank()) {
-                                remoteMap[beer.id] = beer
+                            if (beer.name.isNotBlank() && beer.id !in deletedBeerIds) {
+                                currentInCollection[beer.id] = beer
+                                pendingLocalBeerIds.remove(beer.id)
                             }
                         }
+                        collectionDocs[key] = currentInCollection
                         processAndMergeSnapshots()
                     }
                 }
@@ -391,19 +412,24 @@ class FirebaseBeerRepository(
             // Listen to users/$uId/drinks
             try {
                 val userDrinksRef = db.collection("users").document(uId).collection("drinks")
+                val key = "user_drinks_$uId"
                 val listener = userDrinksRef.addSnapshotListener { snapshots, error ->
                     if (error != null) {
                         Log.d(tag, "Listen notice for users/$uId/drinks: ${error.localizedMessage}")
                         return@addSnapshotListener
                     }
                     if (snapshots != null) {
+                        val currentInCollection = mutableMapOf<String, SavedBeerItem>()
                         for (doc in snapshots.documents) {
+                            if (doc.id in deletedBeerIds) continue
                             val data = doc.data ?: continue
                             val beer = SavedBeerItem.fromMap(doc.id, data)
-                            if (beer.name.isNotBlank()) {
-                                remoteMap[beer.id] = beer
+                            if (beer.name.isNotBlank() && beer.id !in deletedBeerIds) {
+                                currentInCollection[beer.id] = beer
+                                pendingLocalBeerIds.remove(beer.id)
                             }
                         }
+                        collectionDocs[key] = currentInCollection
                         processAndMergeSnapshots()
                     }
                 }
@@ -416,19 +442,24 @@ class FirebaseBeerRepository(
         // Listen to root collection "beers"
         try {
             val globalBeersRef = db.collection("beers")
+            val key = "global_beers"
             val listener = globalBeersRef.addSnapshotListener { snapshots, error ->
                 if (error != null) {
                     Log.d(tag, "Global 'beers' listen notice: ${error.localizedMessage}")
                     return@addSnapshotListener
                 }
                 if (snapshots != null) {
+                    val currentInCollection = mutableMapOf<String, SavedBeerItem>()
                     for (doc in snapshots.documents) {
+                        if (doc.id in deletedBeerIds) continue
                         val data = doc.data ?: continue
                         val beer = SavedBeerItem.fromMap(doc.id, data)
-                        if (beer.name.isNotBlank()) {
-                            remoteMap[beer.id] = beer
+                        if (beer.name.isNotBlank() && beer.id !in deletedBeerIds) {
+                            currentInCollection[beer.id] = beer
+                            pendingLocalBeerIds.remove(beer.id)
                         }
                     }
+                    collectionDocs[key] = currentInCollection
                     processAndMergeSnapshots()
                 }
             }
@@ -440,19 +471,24 @@ class FirebaseBeerRepository(
         // Listen to root collection "drinks"
         try {
             val globalDrinksRef = db.collection("drinks")
+            val key = "global_drinks"
             val listener = globalDrinksRef.addSnapshotListener { snapshots, error ->
                 if (error != null) {
                     Log.d(tag, "Global 'drinks' listen notice: ${error.localizedMessage}")
                     return@addSnapshotListener
                 }
                 if (snapshots != null) {
+                    val currentInCollection = mutableMapOf<String, SavedBeerItem>()
                     for (doc in snapshots.documents) {
+                        if (doc.id in deletedBeerIds) continue
                         val data = doc.data ?: continue
                         val beer = SavedBeerItem.fromMap(doc.id, data)
-                        if (beer.name.isNotBlank()) {
-                            remoteMap[beer.id] = beer
+                        if (beer.name.isNotBlank() && beer.id !in deletedBeerIds) {
+                            currentInCollection[beer.id] = beer
+                            pendingLocalBeerIds.remove(beer.id)
                         }
                     }
+                    collectionDocs[key] = currentInCollection
                     processAndMergeSnapshots()
                 }
             }
@@ -469,6 +505,53 @@ class FirebaseBeerRepository(
         processAndMergeSnapshots()
     }
 
+    /**
+     * Merges duplicate entries representing the same drink into single unique items,
+     * prioritizing higher ratings, non-blank notes, and valid images.
+     * Returns the deduplicated list along with any redundant duplicate IDs that should be cleaned up.
+     */
+    fun deduplicateBeerList(items: List<SavedBeerItem>): Pair<List<SavedBeerItem>, List<String>> {
+        val uniqueList = mutableListOf<SavedBeerItem>()
+        val duplicateIdsToDelete = mutableListOf<String>()
+
+        for (item in items) {
+            val existingIndex = uniqueList.indexOfFirst {
+                it.id == item.id || isSameDrink(it.name, it.brandOrProducer, item.name, item.brandOrProducer)
+            }
+
+            if (existingIndex == -1) {
+                uniqueList.add(item)
+            } else {
+                val existing = uniqueList[existingIndex]
+                if (item.id != existing.id) {
+                    duplicateIdsToDelete.add(item.id)
+                }
+
+                val merged = if (item.timestamp > existing.timestamp ||
+                    (item.rating > existing.rating) ||
+                    (item.userNotes.isNotBlank() && existing.userNotes.isBlank())
+                ) {
+                    item.copy(
+                        id = existing.id,
+                        rating = if (item.rating > 0f) item.rating else existing.rating,
+                        userNotes = if (item.userNotes.isNotBlank()) item.userNotes else existing.userNotes,
+                        imagePath = item.imagePath ?: existing.imagePath,
+                        imageBase64 = item.imageBase64 ?: existing.imageBase64
+                    )
+                } else {
+                    existing.copy(
+                        rating = if (existing.rating > 0f) existing.rating else item.rating,
+                        userNotes = if (existing.userNotes.isNotBlank()) existing.userNotes else item.userNotes,
+                        imagePath = existing.imagePath ?: item.imagePath,
+                        imageBase64 = existing.imageBase64 ?: item.imageBase64
+                    )
+                }
+                uniqueList[existingIndex] = merged
+            }
+        }
+        return Pair(uniqueList.sortedByDescending { it.timestamp }, duplicateIdsToDelete)
+    }
+
     private fun loadLocalCache() {
         if (!localCacheFile.exists()) {
             _beersFlow.value = emptyList()
@@ -478,7 +561,12 @@ class FirebaseBeerRepository(
         try {
             val content = localCacheFile.readText()
             val list = json.decodeFromString<List<SavedBeerItem>>(content)
-            _beersFlow.value = list.sortedByDescending { it.timestamp }
+            val filtered = list.filterNot { it.id in deletedBeerIds }
+            val (deduped, _) = deduplicateBeerList(filtered)
+            _beersFlow.value = deduped
+            if (deduped.size != list.size) {
+                persistLocalCache(deduped)
+            }
         } catch (e: Throwable) {
             Log.w(tag, "Failed to read local beer cache: ${e.localizedMessage}")
             _beersFlow.value = emptyList()
@@ -502,40 +590,76 @@ class FirebaseBeerRepository(
         userNotes: String = "",
         imageBase64: String? = null
     ): SavedBeerItem = withContext(Dispatchers.IO) {
-        val existingItem = _beersFlow.value.find {
-            it.name.equals(drink.name, ignoreCase = true) ||
-            (!it.brandOrProducer.isNullOrBlank() && it.brandOrProducer.equals(drink.brandOrProducer, ignoreCase = true) && it.name.equals(drink.name, ignoreCase = true))
+        val existingItem = findMatchingBeer(drink)
+
+        // If this drink is already in the database:
+        if (existingItem != null) {
+            Log.i(tag, "Drink '${drink.name}' already exists in DB (ID: ${existingItem.id}, list: ${existingItem.listType}). Preventing duplicate save.")
+
+            // If already in the target list and no new rating/notes provided, return existing item without creating duplicates
+            if (existingItem.listType == listType && rating <= 0f && userNotes.isBlank()) {
+                return@withContext existingItem
+            }
+
+            // Updating status or rating/notes of the existing item
+            val beerId = existingItem.id
+            val resolvedBase64 = imageBase64 ?: existingItem.imageBase64 ?: imagePath?.let { path ->
+                val file = File(path)
+                if (file.exists()) ImageUtils.fileToBase64(file) else null
+            }
+            val resolvedImagePath = ensureLocalCachedImage(beerId, imagePath ?: existingItem.imagePath, resolvedBase64)
+
+            val updatedItem = existingItem.copy(
+                listType = listType,
+                imagePath = resolvedImagePath ?: existingItem.imagePath,
+                imageBase64 = resolvedBase64 ?: existingItem.imageBase64,
+                rating = if (rating > 0f) rating else existingItem.rating,
+                userNotes = if (userNotes.isNotBlank()) userNotes else existingItem.userNotes,
+                timestamp = System.currentTimeMillis()
+            )
+
+            // Ensure removed from deleted tombstones and registered as pending sync
+            deletedBeerIds.remove(beerId)
+            persistDeletedBeerIds()
+            pendingLocalBeerIds.add(beerId)
+
+            val updatedList = listOf(updatedItem) + _beersFlow.value.filterNot { it.id == beerId }
+            _beersFlow.value = updatedList
+            persistLocalCache(updatedList)
+            syncBeerToFirestore(updatedItem)
+            return@withContext updatedItem
         }
 
-        val beerId = existingItem?.id ?: UUID.randomUUID().toString()
+        // New unique drink not yet in DB
+        val beerId = UUID.randomUUID().toString()
 
-        // Resolve Base64 image: Use explicitly provided, or convert local file to Base64, or reuse existing
-        val resolvedBase64 = imageBase64 ?: existingItem?.imageBase64 ?: imagePath?.let { path ->
+        val resolvedBase64 = imageBase64 ?: imagePath?.let { path ->
             val file = File(path)
             if (file.exists()) ImageUtils.fileToBase64(file) else null
         }
 
-        // Ensure local file exists on this device so Coil can display it immediately
-        val resolvedImagePath = ensureLocalCachedImage(beerId, imagePath ?: existingItem?.imagePath, resolvedBase64)
+        val resolvedImagePath = ensureLocalCachedImage(beerId, imagePath, resolvedBase64)
 
         val beerItem = SavedBeerItem.fromDrinkDetails(
             id = beerId,
             drink = drink,
             listType = listType,
             imagePath = resolvedImagePath,
-            imageUrl = existingItem?.imageUrl,
+            imageUrl = null,
             imageBase64 = resolvedBase64,
-            rating = if (rating > 0f) rating else (existingItem?.rating ?: 0f),
-            userNotes = if (userNotes.isNotBlank()) userNotes else (existingItem?.userNotes ?: ""),
+            rating = rating,
+            userNotes = userNotes,
             timestamp = System.currentTimeMillis()
         )
 
-        // Update local state immediately for instant UI feedback
-        val updatedList = listOf(beerItem) + _beersFlow.value.filterNot { it.id == beerId }
+        // Ensure removed from deleted tombstones and registered as pending sync
+        deletedBeerIds.remove(beerId)
+        persistDeletedBeerIds()
+        pendingLocalBeerIds.add(beerId)
+
+        val updatedList = listOf(beerItem) + _beersFlow.value
         _beersFlow.value = updatedList
         persistLocalCache(updatedList)
-
-        // Sync with Firestore (including Base64 image)
         syncBeerToFirestore(beerItem)
 
         beerItem
@@ -576,32 +700,66 @@ class FirebaseBeerRepository(
 
     suspend fun deleteBeer(beerId: String) = withContext(Dispatchers.IO) {
         val itemToDelete = _beersFlow.value.find { it.id == beerId }
-        val updatedList = _beersFlow.value.filterNot { it.id == beerId }
+
+        val allTargetIds = mutableSetOf<String>()
+        allTargetIds.add(beerId)
+        if (itemToDelete != null) {
+            _beersFlow.value
+                .filter { isSameDrink(it.name, it.brandOrProducer, itemToDelete.name, itemToDelete.brandOrProducer) }
+                .forEach { allTargetIds.add(it.id) }
+            for (docMap in collectionDocs.values) {
+                docMap.values
+                    .filter { isSameDrink(it.name, it.brandOrProducer, itemToDelete.name, itemToDelete.brandOrProducer) }
+                    .forEach { allTargetIds.add(it.id) }
+            }
+        }
+
+        // Register in deleted set to prevent any resurrecting snapshot
+        deletedBeerIds.addAll(allTargetIds)
+        persistDeletedBeerIds()
+
+        // Remove from pending local saves
+        pendingLocalBeerIds.removeAll(allTargetIds)
+
+        // Remove from all active Firestore collection maps
+        for ((key, map) in collectionDocs) {
+            val filtered = map.filterKeys { it !in allTargetIds }
+            collectionDocs[key] = filtered
+        }
+
+        // Update local StateFlow and persistent JSON cache immediately
+        val updatedList = _beersFlow.value.filterNot { it.id in allTargetIds }
         _beersFlow.value = updatedList
         persistLocalCache(updatedList)
 
-        // Delete local cached image if present
-        try {
-            val cacheFile = File(beerImagesDir, "beer_${beerId}.jpg")
-            if (cacheFile.exists()) cacheFile.delete()
-        } catch (_: Throwable) {}
+        // Delete local cached image files
+        for (targetId in allTargetIds) {
+            try {
+                val cacheFile = File(beerImagesDir, "beer_${targetId}.jpg")
+                if (cacheFile.exists()) cacheFile.delete()
+            } catch (_: Throwable) {}
+        }
 
         ensureInitialized()
 
+        // Delete from Firestore across all user and global collections
         try {
             val db = firestore
             if (db != null) {
-                for (uId in getAllUserIds()) {
+                val userIds = getAllUserIds()
+                for (targetId in allTargetIds) {
+                    for (uId in userIds) {
+                        try {
+                            db.collection("users").document(uId).collection("beers").document(targetId).delete()
+                            db.collection("users").document(uId).collection("drinks").document(targetId).delete()
+                        } catch (_: Throwable) {}
+                    }
                     try {
-                        db.collection("users").document(uId).collection("beers").document(beerId).delete()
-                        db.collection("users").document(uId).collection("drinks").document(beerId).delete()
+                        db.collection("beers").document(targetId).delete()
+                        db.collection("drinks").document(targetId).delete()
                     } catch (_: Throwable) {}
                 }
-                try {
-                    db.collection("beers").document(beerId).delete()
-                    db.collection("drinks").document(beerId).delete()
-                } catch (_: Throwable) {}
-                Log.d(tag, "Successfully deleted beer $beerId from Firestore")
+                Log.d(tag, "Successfully deleted beer(s) $allTargetIds from Firestore")
             }
         } catch (e: Throwable) {
             Log.e(tag, "Failed to delete beer from Firestore: ${e.localizedMessage}", e)
@@ -663,7 +821,7 @@ class FirebaseBeerRepository(
     }
 
     private suspend fun syncAllLocalBeersToFirestore() {
-        val localList = _beersFlow.value
+        val localList = _beersFlow.value.filterNot { it.id in deletedBeerIds }
         if (localList.isEmpty()) return
 
         val db = firestore ?: return
@@ -699,13 +857,70 @@ class FirebaseBeerRepository(
             Log.d(tag, "Successfully batch-synced ${enrichedList.size} local beers with images to Firestore")
         } catch (e: Throwable) {
             Log.w(tag, "Batch sync local beers notice: ${e.localizedMessage}")
-            for (beer in enrichedList) {
-                syncBeerToFirestore(beer)
-            }
+        }
+    }
+
+    fun findMatchingBeer(drink: DrinkDetails): SavedBeerItem? {
+        return _beersFlow.value.find { saved ->
+            isSameDrink(saved.name, saved.brandOrProducer, drink.name, drink.brandOrProducer)
+        }
+    }
+
+    fun findMatchingBeer(name: String, brand: String?): SavedBeerItem? {
+        return _beersFlow.value.find { saved ->
+            isSameDrink(saved.name, saved.brandOrProducer, name, brand)
         }
     }
 
     fun findSavedBeerByName(name: String): SavedBeerItem? {
-        return _beersFlow.value.find { it.name.equals(name, ignoreCase = true) }
+        return findMatchingBeer(name, null)
+    }
+
+    companion object {
+        fun normalizeString(str: String?): String {
+            if (str == null) return ""
+            return str.trim()
+                .lowercase()
+                .replace("ä", "ae")
+                .replace("ö", "oe")
+                .replace("ü", "ue")
+                .replace("ß", "ss")
+                .replace(Regex("[^a-z0-9]"), "")
+        }
+
+        fun isSameDrink(
+            nameA: String,
+            brandA: String?,
+            nameB: String,
+            brandB: String?
+        ): Boolean {
+            val normNameA = normalizeString(nameA)
+            val normNameB = normalizeString(nameB)
+            if (normNameA.isEmpty() || normNameB.isEmpty()) return false
+
+            val normBrandA = normalizeString(brandA)
+            val normBrandB = normalizeString(brandB)
+
+            // Direct normalized name match
+            if (normNameA == normNameB) {
+                if (normBrandA.isNotEmpty() && normBrandB.isNotEmpty()) {
+                    return normBrandA == normBrandB || normBrandA.contains(normBrandB) || normBrandB.contains(normBrandA)
+                }
+                return true
+            }
+
+            // Combined brand + name checks (handles cases where brand is prepended to name or separate)
+            val comboA = if (normBrandA.isNotEmpty() && !normNameA.contains(normBrandA)) normBrandA + normNameA else normNameA
+            val comboB = if (normBrandB.isNotEmpty() && !normNameB.contains(normBrandB)) normBrandB + normNameB else normNameB
+
+            if (comboA == comboB) return true
+
+            if (comboA.contains(comboB) || comboB.contains(comboA)) {
+                val lenDiff = Math.abs(comboA.length - comboB.length)
+                if (lenDiff <= 6) return true
+            }
+
+            return false
+        }
     }
 }

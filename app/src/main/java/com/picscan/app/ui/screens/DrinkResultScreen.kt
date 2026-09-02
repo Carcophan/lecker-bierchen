@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.picscan.app.data.model.BeerListType
 import com.picscan.app.data.model.BeerVerdict
-import com.picscan.app.data.model.SavedBeerItem
+import com.picscan.app.data.repository.FirebaseBeerRepository
 import com.picscan.app.ui.components.BeerVerdictCard
 import com.picscan.app.ui.components.BeerVerdictCelebrationDialog
 import com.picscan.app.ui.components.DrinkCategoryBadge
@@ -67,9 +67,13 @@ fun DrinkResultScreen(
     val beerVerdict = remember(drink) { drink.resolveBeerVerdict() }
     var showBeerAlert by remember(drink) { mutableStateOf(beerVerdict != BeerVerdict.NONE) }
 
-    // Check if this beer is already in the Firebase database
-    val savedBeer = remember(allSavedBeers, drink.name) {
-        allSavedBeers.find { it.name.equals(drink.name, ignoreCase = true) }
+    // Check if this beer is already in the Firebase database using robust matching
+    val savedBeer = remember(allSavedBeers, drink) {
+        allSavedBeers.find { saved ->
+            FirebaseBeerRepository.isSameDrink(
+                saved.name, saved.brandOrProducer, drink.name, drink.brandOrProducer
+            )
+        }
     }
 
     var showEditNoteDialog by remember { mutableStateOf(false) }
@@ -281,15 +285,26 @@ fun DrinkResultScreen(
                         if (savedBeer != null) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primary
+                                color = MaterialTheme.colorScheme.primaryContainer
                             ) {
-                                Text(
-                                    text = if (savedBeer.listType == BeerListType.KNOWN) "✓ In 'Kenne ich'" else "✓ In 'Will ich'",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (savedBeer.listType == BeerListType.KNOWN) "In 'Kenne ich' vorhanden" else "Auf 'Will ich'-Liste",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                     }
@@ -298,12 +313,12 @@ fun DrinkResultScreen(
                         text = if (savedBeer == null)
                             "Speichere dieses Bier direkt in deiner persönlichen Firebase-Datenbank:"
                         else
-                            "Dieses Bier ist in deiner Firebase-Sammlung gespeichert. Status oder Notizen anpassen:",
+                            "Dieses Bier ist bereits in deiner Datenbank vorhanden und kann nicht erneut als Duplikat gespeichert werden. Du kannst den Status wechseln oder Notizen anpassen:",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (savedBeer == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
                     )
 
-                    // Two Primary Action Buttons
+                    // Action Buttons (Prevent duplicates if already saved in the respective list)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -312,14 +327,21 @@ fun DrinkResultScreen(
                         val isKnownSelected = savedBeer?.listType == BeerListType.KNOWN
                         Button(
                             onClick = {
-                                viewModel.saveBeerToList(drink, BeerListType.KNOWN)
+                                if (savedBeer != null) {
+                                    if (!isKnownSelected) {
+                                        viewModel.updateBeerStatus(savedBeer.id, BeerListType.KNOWN)
+                                    }
+                                } else {
+                                    viewModel.saveBeerToList(drink, BeerListType.KNOWN)
+                                }
                             },
+                            enabled = !isKnownSelected,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
                             colors = if (isKnownSelected) {
                                 ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF2E7D32),
-                                    contentColor = Color.White
+                                    disabledContainerColor = Color(0xFF2E7D32).copy(alpha = 0.55f),
+                                    disabledContentColor = Color.White
                                 )
                             } else {
                                 ButtonDefaults.filledTonalButtonColors()
@@ -333,15 +355,24 @@ fun DrinkResultScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text("🍺", fontSize = 16.sp)
+                                    if (isKnownSelected) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color.White
+                                        )
+                                    } else {
+                                        Text("🍺", fontSize = 16.sp)
+                                    }
                                     Text(
-                                        text = "Kenne ich",
+                                        text = if (isKnownSelected) "Bereits in DB" else if (savedBeer != null) "Zu 'Kenne ich'" else "Kenne ich",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelLarge
                                     )
                                 }
                                 Text(
-                                    text = "Schon probiert",
+                                    text = if (isKnownSelected) "Schon probiert ✓" else if (savedBeer != null) "Status ändern" else "Schon probiert",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp
                                 )
@@ -352,14 +383,21 @@ fun DrinkResultScreen(
                         val isWishlistSelected = savedBeer?.listType == BeerListType.WISHLIST
                         Button(
                             onClick = {
-                                viewModel.saveBeerToList(drink, BeerListType.WISHLIST)
+                                if (savedBeer != null) {
+                                    if (!isWishlistSelected) {
+                                        viewModel.updateBeerStatus(savedBeer.id, BeerListType.WISHLIST)
+                                    }
+                                } else {
+                                    viewModel.saveBeerToList(drink, BeerListType.WISHLIST)
+                                }
                             },
+                            enabled = !isWishlistSelected,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(14.dp),
                             colors = if (isWishlistSelected) {
                                 ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF0277BD),
-                                    contentColor = Color.White
+                                    disabledContainerColor = Color(0xFF0277BD).copy(alpha = 0.55f),
+                                    disabledContentColor = Color.White
                                 )
                             } else {
                                 ButtonDefaults.filledTonalButtonColors()
@@ -373,15 +411,24 @@ fun DrinkResultScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text("📌", fontSize = 16.sp)
+                                    if (isWishlistSelected) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = Color.White
+                                        )
+                                    } else {
+                                        Text("📌", fontSize = 16.sp)
+                                    }
                                     Text(
-                                        text = "Will ich",
+                                        text = if (isWishlistSelected) "Bereits in DB" else if (savedBeer != null) "Zu 'Will ich'" else "Will ich",
                                         fontWeight = FontWeight.Bold,
                                         style = MaterialTheme.typography.labelLarge
                                     )
                                 }
                                 Text(
-                                    text = "Wunschliste",
+                                    text = if (isWishlistSelected) "Auf Wunschliste ✓" else if (savedBeer != null) "Status ändern" else "Wunschliste",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontSize = 10.sp
                                 )

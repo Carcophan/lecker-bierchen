@@ -212,6 +212,21 @@ class ScannerViewModel(
         notes: String = ""
     ) {
         viewModelScope.launch {
+            val existing = beerRepo.findMatchingBeer(drink)
+            if (existing != null) {
+                if (existing.listType == listType) {
+                    val listName = if (listType == BeerListType.KNOWN) "Kenne ich" else "Will ich"
+                    _uiState.value = _uiState.value.copy(
+                        saveSuccessMessage = "ℹ️ '${drink.name}' ist bereits in '$listName' vorhanden!"
+                    )
+                    return@launch
+                } else {
+                    // Beverage exists in the other list -> switch status without creating a duplicate
+                    updateBeerStatus(existing.id, listType)
+                    return@launch
+                }
+            }
+
             val imgPath = _uiState.value.currentImagePath
             val imgBitmap = _uiState.value.currentImageBitmap
             val base64 = _uiState.value.currentImageBase64
@@ -259,6 +274,14 @@ class ScannerViewModel(
 
     fun findSavedBeerByName(name: String): SavedBeerItem? {
         return beerRepo.findSavedBeerByName(name)
+    }
+
+    fun findMatchingSavedBeer(drink: DrinkDetails): SavedBeerItem? {
+        return beerRepo.findMatchingBeer(drink)
+    }
+
+    fun findMatchingSavedBeer(name: String, brand: String?): SavedBeerItem? {
+        return beerRepo.findMatchingBeer(name, brand)
     }
 
     fun saveApiKey(newKey: String) {

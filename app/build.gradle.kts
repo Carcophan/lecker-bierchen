@@ -106,4 +106,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.guava)
 
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation("junit:junit:4.13.2")
 }

@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -99,8 +100,11 @@ fun BeerCollectionScreen(
     }
 
     val syncState by viewModel.syncState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Meine Biere (Firebase)", fontWeight = FontWeight.Bold) },
@@ -493,8 +497,12 @@ fun BeerCollectionScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        val deletedName = beer.name
                         viewModel.deleteBeerFromList(beer.id)
                         beerToDelete = null
+                        scope.launch {
+                            snackbarHostState.showSnackbar("🗑️ '$deletedName' gelöscht")
+                        }
                     }
                 ) {
                     Text("Löschen", color = MaterialTheme.colorScheme.error)

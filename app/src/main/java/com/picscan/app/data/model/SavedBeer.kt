@@ -50,6 +50,7 @@ data class SavedBeerItem(
     val timestamp: Long = System.currentTimeMillis(),
     val imagePath: String? = null,
     val imageUrl: String? = null,
+    val imageBase64: String? = null,
     val sweetnessLevel: Int = 3,
     val bitternessLevel: Int = 3,
     val acidityLevel: Int = 3,
@@ -103,6 +104,7 @@ data class SavedBeerItem(
             "timestamp" to timestamp,
             "imagePath" to imagePath,
             "imageUrl" to imageUrl,
+            "imageBase64" to imageBase64,
             "sweetnessLevel" to sweetnessLevel,
             "bitternessLevel" to bitternessLevel,
             "acidityLevel" to acidityLevel,
@@ -121,6 +123,8 @@ data class SavedBeerItem(
             drink: DrinkDetails,
             listType: BeerListType,
             imagePath: String? = null,
+            imageUrl: String? = null,
+            imageBase64: String? = null,
             rating: Float = 0f,
             userNotes: String = "",
             timestamp: Long = System.currentTimeMillis()
@@ -141,6 +145,8 @@ data class SavedBeerItem(
                 userNotes = userNotes,
                 timestamp = timestamp,
                 imagePath = imagePath,
+                imageUrl = imageUrl,
+                imageBase64 = imageBase64,
                 sweetnessLevel = drink.flavorProfile.sweetnessLevel,
                 bitternessLevel = drink.flavorProfile.bitternessLevel,
                 acidityLevel = drink.flavorProfile.acidityLevel,
@@ -215,10 +221,14 @@ data class SavedBeerItem(
                 ?: System.currentTimeMillis()
 
             val imagePath = (map["imagePath"] as? String)
-                ?: (map["image"] as? String)
+                ?: (map["image"] as? String)?.takeIf { !it.length.let { len -> len > 500 } && !it.startsWith("/9j/") && !it.startsWith("data:") }
 
             val imageUrl = (map["imageUrl"] as? String)
                 ?: (map["url"] as? String)
+
+            val imageBase64 = (map["imageBase64"] as? String)
+                ?: (map["imageData"] as? String)
+                ?: (map["image"] as? String)?.takeIf { it.length > 500 || it.startsWith("/9j/") || it.startsWith("data:") }
 
             val aromasList = (map["aromas"] as? List<*>)?.mapNotNull { it?.toString() }
                 ?: (nestedDrink?.get("aromas") as? List<*>)?.mapNotNull { it?.toString() }
@@ -248,6 +258,7 @@ data class SavedBeerItem(
                 timestamp = timestamp,
                 imagePath = imagePath,
                 imageUrl = imageUrl,
+                imageBase64 = imageBase64,
                 sweetnessLevel = ((map["sweetnessLevel"] as? Number)?.toInt()) ?: 3,
                 bitternessLevel = ((map["bitternessLevel"] as? Number)?.toInt()) ?: 3,
                 acidityLevel = ((map["acidityLevel"] as? Number)?.toInt()) ?: 3,

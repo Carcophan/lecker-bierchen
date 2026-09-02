@@ -34,6 +34,7 @@ import com.picscan.app.data.model.SavedBeerItem
 import com.picscan.app.data.repository.SyncState
 import com.picscan.app.ui.components.DrinkCategoryBadge
 import com.picscan.app.ui.viewmodel.ScannerViewModel
+import com.picscan.app.util.ImageUtils
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -555,9 +556,21 @@ fun SavedBeerCard(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (!beer.imagePath.isNullOrBlank()) {
+                val hasLocalFile = !beer.imagePath.isNullOrBlank() && File(beer.imagePath).exists()
+                val imageBase64Bytes = if (!hasLocalFile && !beer.imageBase64.isNullOrBlank()) {
+                    remember(beer.imageBase64) { ImageUtils.base64ToByteArray(beer.imageBase64) }
+                } else null
+
+                if (hasLocalFile) {
                     AsyncImage(
-                        model = File(beer.imagePath),
+                        model = File(beer.imagePath!!),
+                        contentDescription = beer.name,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (imageBase64Bytes != null) {
+                    AsyncImage(
+                        model = imageBase64Bytes,
                         contentDescription = beer.name,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

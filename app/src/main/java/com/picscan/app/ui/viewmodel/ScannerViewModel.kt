@@ -28,6 +28,7 @@ data class ScannerUiState(
     val currentDrink: DrinkDetails? = null,
     val currentImageBitmap: Bitmap? = null,
     val currentImagePath: String? = null,
+    val currentImageBase64: String? = null,
     val errorMessage: String? = null,
     val isFlashOn: Boolean = false,
     val lensFacing: Int = CameraSelector.LENS_FACING_BACK,
@@ -161,7 +162,8 @@ class ScannerViewModel(
                 _uiState.value = _uiState.value.copy(
                     isAnalyzing = false,
                     currentDrink = drinkDetails,
-                    currentImagePath = savedItem.imagePath
+                    currentImagePath = savedItem.imagePath,
+                    currentImageBase64 = null
                 )
                 onComplete()
             }.onFailure { error ->
@@ -177,6 +179,7 @@ class ScannerViewModel(
         _uiState.value = _uiState.value.copy(
             currentDrink = item.drink,
             currentImagePath = item.imagePath,
+            currentImageBase64 = null,
             currentImageBitmap = null
         )
     }
@@ -185,6 +188,7 @@ class ScannerViewModel(
         _uiState.value = _uiState.value.copy(
             currentDrink = beer.toDrinkDetails(),
             currentImagePath = beer.imagePath,
+            currentImageBase64 = beer.imageBase64,
             currentImageBitmap = null
         )
     }
@@ -209,12 +213,17 @@ class ScannerViewModel(
     ) {
         viewModelScope.launch {
             val imgPath = _uiState.value.currentImagePath
+            val imgBitmap = _uiState.value.currentImageBitmap
+            val base64 = _uiState.value.currentImageBase64
+                ?: (if (imgBitmap != null) ImageUtils.bitmapToBase64(imgBitmap) else null)
+
             beerRepo.saveBeer(
                 drink = drink,
                 listType = listType,
                 imagePath = imgPath,
                 rating = rating,
-                userNotes = notes
+                userNotes = notes,
+                imageBase64 = base64
             )
             val msg = when (listType) {
                 BeerListType.KNOWN -> "🍺 In 'Kenne ich' (Firebase) gespeichert!"

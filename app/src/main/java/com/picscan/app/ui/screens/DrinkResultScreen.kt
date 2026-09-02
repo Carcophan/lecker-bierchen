@@ -35,6 +35,7 @@ import com.picscan.app.ui.components.InfoChip
 import com.picscan.app.ui.components.LevelIndicator
 import com.picscan.app.ui.components.TagChip
 import com.picscan.app.ui.viewmodel.ScannerViewModel
+import com.picscan.app.util.ImageUtils
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -189,6 +190,14 @@ fun DrinkResultScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
+                val hasLocalFile = !uiState.currentImagePath.isNullOrBlank() && File(uiState.currentImagePath!!).exists()
+                val base64Bytes = if (!hasLocalFile && uiState.currentImageBitmap == null) {
+                    val rawBase64 = uiState.currentImageBase64 ?: savedBeer?.imageBase64
+                    if (!rawBase64.isNullOrBlank()) {
+                        remember(rawBase64) { ImageUtils.base64ToByteArray(rawBase64) }
+                    } else null
+                } else null
+
                 if (uiState.currentImageBitmap != null) {
                     Image(
                         bitmap = uiState.currentImageBitmap!!.asImageBitmap(),
@@ -196,9 +205,16 @@ fun DrinkResultScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                } else if (uiState.currentImagePath != null) {
+                } else if (hasLocalFile) {
                     AsyncImage(
                         model = File(uiState.currentImagePath!!),
+                        contentDescription = "Getränkefoto",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (base64Bytes != null) {
+                    AsyncImage(
+                        model = base64Bytes,
                         contentDescription = "Getränkefoto",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop

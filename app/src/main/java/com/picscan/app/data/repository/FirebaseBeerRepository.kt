@@ -14,6 +14,7 @@ import com.google.firebase.firestore.SetOptions
 import com.picscan.app.data.model.BeerListType
 import com.picscan.app.data.model.DrinkDetails
 import com.picscan.app.data.model.SavedBeerItem
+import com.picscan.app.util.ImageUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -52,6 +53,7 @@ class FirebaseBeerRepository(
     }
 
     private val localCacheFile = File(context.filesDir, "saved_beers_cache.json")
+    private val beerImagesDir = File(context.filesDir, "beer_images").apply { mkdirs() }
 
     private val _beersFlow = MutableStateFlow<List<SavedBeerItem>>(emptyList())
     val allBeersFlow: Flow<List<SavedBeerItem>> = _beersFlow.asStateFlow()
@@ -277,6 +279,25 @@ class FirebaseBeerRepository(
         }
     }
 
+    /**
+     * Ensures that an image received from Firestore (as Base64) is decoded and stored as a local file,
+     * so that Coil and local file loaders can load it fast and offline.
+     */
+    private fun ensureLocalCachedImage(beerId: String, currentPath: String?, imageBase64: String?): String? {
+        if (!currentPath.isNullOrBlank() && File(currentPath).exists()) {
+            return currentPath
+        }
+        if (imageBase64.isNullOrBlank()) return currentPath
+
+        val cacheFile = File(beerImagesDir, "beer_${beerId}.jpg")
+        if (cacheFile.exists() && cacheFile.length() > 0) {
+            return cacheFile.absolutePath
+        }
+
+        val success = ImageUtils.saveBase64ToFile(imageBase64, cacheFile)
+        return if (success) cacheFile.absolutePath else currentPath
+    }
+
     private fun startFirestoreListeners() {
         val db = firestore ?: return
 
@@ -290,7 +311,15 @@ class FirebaseBeerRepository(
         fun processAndMergeSnapshots() {
             val currentMap = _beersFlow.value.associateBy { it.id }.toMutableMap()
 
-            for ((id, remote) in remoteMap) {
+            for ((id, rawRemote) in remoteMap) {
+                // Ensure image from Firestore Base64 is cached locally for fast display
+                val localPath = ensureLocalCachedImage(rawRemote.id, rawRemote.imagePath, rawRemote.imageBase64)
+                val remote = if (localPath != null && localPath != rawRemote.imagePath) {
+                    rawRemote.copy(imagePath = localPath)
+                } else {
+                    rawRemote
+                }
+
                 // Deduplicate by ID or by Name + Brand
                 val existingByKey = currentMap.values.find {
                     it.id == id || (it.name.equals(remote.name, ignoreCase = true) &&
@@ -301,7 +330,7 @@ class FirebaseBeerRepository(
                 if (existingByKey == null) {
                     currentMap[remote.id] = remote
                 } else {
-                    // Pick the one with higher timestamp or rating/notes
+                    // Pick the one with higher timestamp or rating/notes, preserving local/remote image data
                     val chosen = if (remote.timestamp > existingByKey.timestamp ||
                         (remote.rating > existingByKey.rating) ||
                         (remote.userNotes.isNotBlank() && existingByKey.userNotes.isBlank())
@@ -310,13 +339,15 @@ class FirebaseBeerRepository(
                             id = existingByKey.id,
                             rating = if (remote.rating > 0f) remote.rating else existingByKey.rating,
                             userNotes = if (remote.userNotes.isNotBlank()) remote.userNotes else existingByKey.userNotes,
-                            imagePath = remote.imagePath ?: existingByKey.imagePath
+                            imagePath = remote.imagePath ?: existingByKey.imagePath,
+                            imageBase64 = remote.imageBase64 ?: existingByKey.imageBase64
                         )
                     } else {
                         existingByKey.copy(
                             rating = if (existingByKey.rating > 0f) existingByKey.rating else remote.rating,
                             userNotes = if (existingByKey.userNotes.isNotBlank()) existingByKey.userNotes else remote.userNotes,
-                            imagePath = existingByKey.imagePath ?: remote.imagePath
+                            imagePath = existingByKey.imagePath ?: remote.imagePath,
+                            imageBase64 = existingByKey.imageBase64 ?: remote.imageBase64
                         )
                     }
                     currentMap[chosen.id] = chosen
@@ -468,7 +499,8 @@ class FirebaseBeerRepository(
         listType: BeerListType,
         imagePath: String? = null,
         rating: Float = 0f,
-        userNotes: String = ""
+        userNotes: String = "",
+        imageBase64: String? = null
     ): SavedBeerItem = withContext(Dispatchers.IO) {
         val existingItem = _beersFlow.value.find {
             it.name.equals(drink.name, ignoreCase = true) ||
@@ -476,11 +508,23 @@ class FirebaseBeerRepository(
         }
 
         val beerId = existingItem?.id ?: UUID.randomUUID().toString()
+
+        // Resolve Base64 image: Use explicitly provided, or convert local file to Base64, or reuse existing
+        val resolvedBase64 = imageBase64 ?: existingItem?.imageBase64 ?: imagePath?.let { path ->
+            val file = File(path)
+            if (file.exists()) ImageUtils.fileToBase64(file) else null
+        }
+
+        // Ensure local file exists on this device so Coil can display it immediately
+        val resolvedImagePath = ensureLocalCachedImage(beerId, imagePath ?: existingItem?.imagePath, resolvedBase64)
+
         val beerItem = SavedBeerItem.fromDrinkDetails(
             id = beerId,
             drink = drink,
             listType = listType,
-            imagePath = imagePath ?: existingItem?.imagePath,
+            imagePath = resolvedImagePath,
+            imageUrl = existingItem?.imageUrl,
+            imageBase64 = resolvedBase64,
             rating = if (rating > 0f) rating else (existingItem?.rating ?: 0f),
             userNotes = if (userNotes.isNotBlank()) userNotes else (existingItem?.userNotes ?: ""),
             timestamp = System.currentTimeMillis()
@@ -491,7 +535,7 @@ class FirebaseBeerRepository(
         _beersFlow.value = updatedList
         persistLocalCache(updatedList)
 
-        // Sync with Firestore
+        // Sync with Firestore (including Base64 image)
         syncBeerToFirestore(beerItem)
 
         beerItem
@@ -531,9 +575,16 @@ class FirebaseBeerRepository(
     }
 
     suspend fun deleteBeer(beerId: String) = withContext(Dispatchers.IO) {
+        val itemToDelete = _beersFlow.value.find { it.id == beerId }
         val updatedList = _beersFlow.value.filterNot { it.id == beerId }
         _beersFlow.value = updatedList
         persistLocalCache(updatedList)
+
+        // Delete local cached image if present
+        try {
+            val cacheFile = File(beerImagesDir, "beer_${beerId}.jpg")
+            if (cacheFile.exists()) cacheFile.delete()
+        } catch (_: Throwable) {}
 
         ensureInitialized()
 
@@ -563,7 +614,23 @@ class FirebaseBeerRepository(
         try {
             val db = firestore
             if (db != null) {
-                val mapData = beer.toMap()
+                // Ensure imageBase64 is generated if local imagePath exists but imageBase64 is missing
+                val effectiveBeer = if (beer.imageBase64.isNullOrBlank() && !beer.imagePath.isNullOrBlank()) {
+                    val file = File(beer.imagePath)
+                    if (file.exists()) {
+                        val b64 = ImageUtils.fileToBase64(file)
+                        if (b64 != null) {
+                            val updated = beer.copy(imageBase64 = b64)
+                            // Update local list with base64
+                            val updatedList = _beersFlow.value.map { if (it.id == beer.id) updated else it }
+                            _beersFlow.value = updatedList
+                            persistLocalCache(updatedList)
+                            updated
+                        } else beer
+                    } else beer
+                } else beer
+
+                val mapData = effectiveBeer.toMap()
                 val userIds = getAllUserIds()
 
                 for (uId in userIds) {
@@ -571,7 +638,7 @@ class FirebaseBeerRepository(
                         db.collection("users")
                             .document(uId)
                             .collection("beers")
-                            .document(beer.id)
+                            .document(effectiveBeer.id)
                             .set(mapData, SetOptions.merge())
                     } catch (e: Throwable) {
                         Log.d(tag, "Sync to users/$uId/beers notice: ${e.localizedMessage}")
@@ -580,13 +647,13 @@ class FirebaseBeerRepository(
 
                 try {
                     db.collection("beers")
-                        .document(beer.id)
+                        .document(effectiveBeer.id)
                         .set(mapData, SetOptions.merge())
                 } catch (e: Throwable) {
                     Log.d(tag, "Sync to root beers notice: ${e.localizedMessage}")
                 }
 
-                Log.d(tag, "Successfully synced beer '${beer.name}' (${beer.id}) to Firestore")
+                Log.d(tag, "Successfully synced beer '${effectiveBeer.name}' (${effectiveBeer.id}) with image to Firestore")
             } else {
                 Log.w(tag, "Cannot sync beer to Firestore: db is null")
             }
@@ -602,22 +669,37 @@ class FirebaseBeerRepository(
         val db = firestore ?: return
         if (currentUserId.isBlank()) return
 
+        // Enrich any beers that have local image files but no Base64 yet
+        val enrichedList = localList.map { beer ->
+            if (beer.imageBase64.isNullOrBlank() && !beer.imagePath.isNullOrBlank()) {
+                val file = File(beer.imagePath)
+                if (file.exists()) {
+                    val b64 = ImageUtils.fileToBase64(file)
+                    if (b64 != null) beer.copy(imageBase64 = b64) else beer
+                } else beer
+            } else beer
+        }
+        if (enrichedList != localList) {
+            _beersFlow.value = enrichedList
+            persistLocalCache(enrichedList)
+        }
+
         try {
             val batch = db.batch()
             val userBeersRef = db.collection("users")
                 .document(currentUserId)
                 .collection("beers")
 
-            for (beer in localList) {
+            for (beer in enrichedList) {
                 val docRef = userBeersRef.document(beer.id)
                 batch.set(docRef, beer.toMap(), SetOptions.merge())
             }
 
             batch.commit().await()
-            Log.d(tag, "Successfully batch-synced ${localList.size} local beers to Firestore")
+            Log.d(tag, "Successfully batch-synced ${enrichedList.size} local beers with images to Firestore")
         } catch (e: Throwable) {
             Log.w(tag, "Batch sync local beers notice: ${e.localizedMessage}")
-            for (beer in localList) {
+            for (beer in enrichedList) {
                 syncBeerToFirestore(beer)
             }
         }

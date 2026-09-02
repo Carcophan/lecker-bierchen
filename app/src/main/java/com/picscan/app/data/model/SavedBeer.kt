@@ -154,36 +154,100 @@ data class SavedBeerItem(
         }
 
         fun fromMap(id: String, map: Map<String, Any?>): SavedBeerItem {
-            val verdictString = map["beerVerdict"] as? String ?: ""
+            val nestedDrink = map["drink"] as? Map<*, *>
+
+            val name = (map["name"] as? String)
+                ?: (map["title"] as? String)
+                ?: (map["drinkName"] as? String)
+                ?: (nestedDrink?.get("name") as? String)
+                ?: ""
+
+            val category = (map["category"] as? String)
+                ?: (map["type"] as? String)
+                ?: (nestedDrink?.get("category") as? String)
+                ?: "Bier"
+
+            val brandOrProducer = (map["brandOrProducer"] as? String)
+                ?: (map["brand"] as? String)
+                ?: (map["producer"] as? String)
+                ?: (nestedDrink?.get("brandOrProducer") as? String)
+
+            val origin = (map["origin"] as? String)
+                ?: (nestedDrink?.get("origin") as? String)
+
+            val abvOrCaffeine = (map["abvOrCaffeine"] as? String)
+                ?: (map["abv"] as? String)
+                ?: (nestedDrink?.get("abvOrCaffeine") as? String)
+
+            val description = (map["description"] as? String)
+                ?: (nestedDrink?.get("description") as? String)
+                ?: ""
+
+            val verdictString = (map["beerVerdict"] as? String)
+                ?: (map["verdict"] as? String)
+                ?: (nestedDrink?.get("beerVerdict") as? String)
+                ?: ""
+
             val verdict = try {
-                BeerVerdict.valueOf(verdictString)
+                if (verdictString.isNotBlank()) BeerVerdict.valueOf(verdictString.uppercase()) else BeerVerdict.NONE
             } catch (_: Exception) {
                 BeerVerdict.NONE
             }
 
-            val listTypeString = map["listType"] as? String
+            val listTypeString = (map["listType"] as? String)
+                ?: (map["status"] as? String)
+                ?: (map["list"] as? String)
+
             val listType = BeerListType.fromString(listTypeString)
 
-            val aromasList = (map["aromas"] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-            val tastingNotesList = (map["tastingNotes"] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
-            val foodPairingsList = (map["foodPairings"] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+            val rating = ((map["rating"] as? Number)?.toFloat())
+                ?: ((map["score"] as? Number)?.toFloat())
+                ?: ((map["stars"] as? Number)?.toFloat())
+                ?: 0f
+
+            val userNotes = (map["userNotes"] as? String)
+                ?: (map["notes"] as? String)
+                ?: (map["comment"] as? String)
+                ?: ""
+
+            val timestamp = ((map["timestamp"] as? Number)?.toLong())
+                ?: ((map["createdAt"] as? Number)?.toLong())
+                ?: System.currentTimeMillis()
+
+            val imagePath = (map["imagePath"] as? String)
+                ?: (map["image"] as? String)
+
+            val imageUrl = (map["imageUrl"] as? String)
+                ?: (map["url"] as? String)
+
+            val aromasList = (map["aromas"] as? List<*>)?.mapNotNull { it?.toString() }
+                ?: (nestedDrink?.get("aromas") as? List<*>)?.mapNotNull { it?.toString() }
+                ?: emptyList()
+
+            val tastingNotesList = (map["tastingNotes"] as? List<*>)?.mapNotNull { it?.toString() }
+                ?: (nestedDrink?.get("tastingNotes") as? List<*>)?.mapNotNull { it?.toString() }
+                ?: emptyList()
+
+            val foodPairingsList = (map["foodPairings"] as? List<*>)?.mapNotNull { it?.toString() }
+                ?: (nestedDrink?.get("foodPairings") as? List<*>)?.mapNotNull { it?.toString() }
+                ?: emptyList()
 
             return SavedBeerItem(
                 id = id,
-                name = (map["name"] as? String) ?: "",
-                category = (map["category"] as? String) ?: "Bier",
-                brandOrProducer = map["brandOrProducer"] as? String,
-                origin = map["origin"] as? String,
-                abvOrCaffeine = map["abvOrCaffeine"] as? String,
-                description = (map["description"] as? String) ?: "",
+                name = name,
+                category = category,
+                brandOrProducer = brandOrProducer,
+                origin = origin,
+                abvOrCaffeine = abvOrCaffeine,
+                description = description,
                 beerVerdict = verdict,
-                beerVerdictReason = map["beerVerdictReason"] as? String,
+                beerVerdictReason = (map["beerVerdictReason"] as? String) ?: (nestedDrink?.get("beerVerdictReason") as? String),
                 listType = listType,
-                rating = ((map["rating"] as? Number)?.toFloat()) ?: 0f,
-                userNotes = (map["userNotes"] as? String) ?: "",
-                timestamp = ((map["timestamp"] as? Number)?.toLong()) ?: System.currentTimeMillis(),
-                imagePath = map["imagePath"] as? String,
-                imageUrl = map["imageUrl"] as? String,
+                rating = rating,
+                userNotes = userNotes,
+                timestamp = timestamp,
+                imagePath = imagePath,
+                imageUrl = imageUrl,
                 sweetnessLevel = ((map["sweetnessLevel"] as? Number)?.toInt()) ?: 3,
                 bitternessLevel = ((map["bitternessLevel"] as? Number)?.toInt()) ?: 3,
                 acidityLevel = ((map["acidityLevel"] as? Number)?.toInt()) ?: 3,

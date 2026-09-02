@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.picscan.app.data.repository.ApiKeyPreferenceRepository
+import com.picscan.app.data.repository.SyncState
 import com.picscan.app.ui.viewmodel.ScannerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,10 +46,18 @@ fun SettingsScreen(
     val selectedModel by viewModel.selectedModel.collectAsState()
     val knownBeers by viewModel.knownBeers.collectAsState()
     val wishlistBeers by viewModel.wishlistBeers.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
+    val currentUserId = viewModel.currentUserId
 
     var apiKeyInput by remember(currentApiKey) { mutableStateOf(currentApiKey) }
     var isApiKeyVisible by remember { mutableStateOf(false) }
     var saveFeedbackMessage by remember { mutableStateOf<String?>(null) }
+
+    var customUserIdInput by remember(currentUserId) { mutableStateOf(currentUserId) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+    var isPasswordVisible by remember { mutableStateOf(false) }
+    var userAuthFeedbackMessage by remember { mutableStateOf<String?>(null) }
 
     val scrollState = rememberScrollState()
 
@@ -106,6 +116,89 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
 
+                    // Sync Status Indicator
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                when (val state = syncState) {
+                                    is SyncState.Syncing -> {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                        Text(
+                                            text = "Synchronisiere mit Firebase...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    is SyncState.Success -> {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Verbunden & synchronisiert (${state.itemCount} Biere)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    is SyncState.Error -> {
+                                        Icon(
+                                            Icons.Default.ErrorOutline,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Fehler: ${state.message}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                    else -> {
+                                        Text(
+                                            text = "Firebase Betriebsbereit",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.refreshFirebaseSync() },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "Manuell synchronisieren",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (currentUserId.isNotBlank()) {
+                        Text(
+                            text = "Firebase Nutzer-ID: $currentUserId",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -137,6 +230,143 @@ fun SettingsScreen(
                                 Text("Will ich: ${wishlistBeers.size}", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodySmall)
                             }
                         }
+                    }
+                }
+            }
+
+            // Firebase User ID & Email Authentication Card
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Firebase Nutzer-ID & Konto",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Text(
+                        text = "Gib deine UUID oder Nutzer-ID aus der Firestore-Datenbank ein, um deine Biere direkt zu laden:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = customUserIdInput,
+                        onValueChange = {
+                            customUserIdInput = it
+                            userAuthFeedbackMessage = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Nutzer-ID / UUID") },
+                        singleLine = true,
+                        trailingIcon = {
+                            if (customUserIdInput.isNotEmpty()) {
+                                IconButton(onClick = { customUserIdInput = "" }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Leeren")
+                                }
+                            }
+                        }
+                    )
+
+                    Button(
+                        onClick = {
+                            if (customUserIdInput.isNotBlank()) {
+                                viewModel.setCustomUserId(customUserIdInput)
+                                focusManager.clearFocus()
+                                userAuthFeedbackMessage = "Nutzer-ID / UUID gesetzt & Synchronisation gestartet!"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Nutzer-ID / UUID festlegen & synchronisieren")
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                    Text(
+                        text = "Oder melde dich mit deiner E-Mail-Adresse & Passwort bei Firebase Auth an:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = {
+                            emailInput = it
+                            userAuthFeedbackMessage = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("E-Mail-Adresse") },
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = {
+                            passwordInput = it
+                            userAuthFeedbackMessage = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Passwort") },
+                        singleLine = true,
+                        visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = "Passwort anzeigen"
+                                )
+                            }
+                        }
+                    )
+
+                    Button(
+                        onClick = {
+                            if (emailInput.isNotBlank() && passwordInput.isNotBlank()) {
+                                viewModel.signInWithEmailAndPassword(emailInput, passwordInput) { res ->
+                                    res.onSuccess { uid ->
+                                        userAuthFeedbackMessage = "Erfolgreich als $emailInput angemeldet! (UID: $uid)"
+                                    }.onFailure { err ->
+                                        userAuthFeedbackMessage = "Anmeldung fehlgeschlagen: ${err.localizedMessage}"
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Mit E-Mail anmelden")
+                    }
+
+                    if (userAuthFeedbackMessage != null) {
+                        Text(
+                            text = userAuthFeedbackMessage!!,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }

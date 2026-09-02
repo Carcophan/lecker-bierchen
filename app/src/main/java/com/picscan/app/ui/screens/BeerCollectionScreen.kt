@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.picscan.app.data.model.BeerListType
 import com.picscan.app.data.model.BeerVerdict
 import com.picscan.app.data.model.SavedBeerItem
+import com.picscan.app.data.repository.SyncState
 import com.picscan.app.ui.components.DrinkCategoryBadge
 import com.picscan.app.ui.viewmodel.ScannerViewModel
 import java.io.File
@@ -96,6 +97,8 @@ fun BeerCollectionScreen(
         }
     }
 
+    val syncState by viewModel.syncState.collectAsState()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -106,6 +109,38 @@ fun BeerCollectionScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.refreshFirebaseSync() }) {
+                        when (syncState) {
+                            is SyncState.Syncing -> {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            is SyncState.Success -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = "Firebase synchronisiert",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            is SyncState.Error -> {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Synchronisationsfehler – Erneut versuchen",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            else -> {
+                                Icon(
+                                    imageVector = Icons.Default.Sync,
+                                    contentDescription = "Firebase synchronisieren"
+                                )
+                            }
+                        }
+                    }
+
                     Box {
                         IconButton(onClick = { showSortMenu = true }) {
                             Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sortieren")
@@ -147,6 +182,50 @@ fun BeerCollectionScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            when (val state = syncState) {
+                is SyncState.Syncing -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            Text(
+                                text = "Firebase synchronisiert vorhandene Getränke...",
+                                style = MaterialTheme.typography.labelMedium
+                            )
+                        }
+                    }
+                }
+                is SyncState.Error -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Sync Hinweis: ${state.message}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = { viewModel.refreshFirebaseSync() }) {
+                                Text("Erneut versuchen", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+                else -> {}
+            }
+
             // Tab Selector: "Kenne ich" vs "Will ich"
             PrimaryTabRow(
                 selectedTabIndex = if (selectedTab == BeerListType.KNOWN) 0 else 1,

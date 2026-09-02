@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -29,6 +30,14 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+
+sealed class SyncState {
+    data object Idle : SyncState()
+    data object Syncing : SyncState()
+    data class Success(val itemCount: Int, val timestamp: Long = System.currentTimeMillis()) : SyncState()
+    data class Error(val message: String) : SyncState()
+}
 
 class FirebaseBeerRepository(
     private val context: Context,
@@ -55,10 +64,16 @@ class FirebaseBeerRepository(
         list.filter { it.listType == BeerListType.WISHLIST }.sortedByDescending { it.timestamp }
     }
 
-    private var firestoreListener: ListenerRegistration? = null
+    private val _syncState = MutableStateFlow<SyncState>(SyncState.Syncing)
+    val syncState: StateFlow<SyncState> = _syncState.asStateFlow()
+
+    private val activeListeners = mutableListOf<ListenerRegistration>()
     private var firestore: FirebaseFirestore? = null
     private var auth: FirebaseAuth? = null
     private var currentUserId: String = ""
+
+    val userId: String
+        get() = currentUserId
 
     private val initJob: Job
 
@@ -79,6 +94,9 @@ class FirebaseBeerRepository(
             } else {
                 true
             }
+        } catch (e: SecurityException) {
+            Log.w(tag, "SecurityException checking Google Play Services availability: ${e.localizedMessage}")
+            false
         } catch (e: Throwable) {
             Log.w(tag, "Google Play Services check notice: ${e.localizedMessage}")
             false
@@ -92,7 +110,12 @@ class FirebaseBeerRepository(
     }
 
     private suspend fun initFirebase() {
+        _syncState.value = SyncState.Syncing
         try {
+            if (currentUserId.isBlank()) {
+                currentUserId = getOrCreateStableUserId()
+            }
+
             if (FirebaseApp.getApps(context).isEmpty()) {
                 FirebaseApp.initializeApp(context)
             }
@@ -100,30 +123,35 @@ class FirebaseBeerRepository(
             if (isGooglePlayServicesAvailable()) {
                 try {
                     auth = FirebaseAuth.getInstance()
+                } catch (e: SecurityException) {
+                    Log.w(tag, "SecurityException initializing FirebaseAuth (GMS broker issue): ${e.localizedMessage}")
+                    auth = null
                 } catch (e: Throwable) {
                     Log.w(tag, "FirebaseAuth initialization notice: ${e.localizedMessage}")
+                    auth = null
                 }
             } else {
                 Log.i(tag, "Google Play Services not available, using device storage fallback ID")
+                auth = null
             }
 
             try {
-                firestore = FirebaseFirestore.getInstance().apply {
-                    try {
-                        val settings = FirebaseFirestoreSettings.Builder()
-                            .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
-                            .build()
-                        firestoreSettings = settings
-                    } catch (e: Throwable) {
-                        Log.d(tag, "Firestore settings notice: ${e.localizedMessage}")
-                    }
+                val db = FirebaseFirestore.getInstance()
+                try {
+                    val settings = FirebaseFirestoreSettings.Builder()
+                        .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
+                        .build()
+                    db.firestoreSettings = settings
+                } catch (e: Throwable) {
+                    Log.d(tag, "Firestore settings notice: ${e.localizedMessage}")
                 }
+                firestore = db
             } catch (e: Throwable) {
                 Log.w(tag, "Firestore initialization notice: ${e.localizedMessage}")
             }
 
             ensureUserAuthenticated()
-            startFirestoreListener()
+            startFirestoreListeners()
 
             // Push any locally cached beers to Firestore to ensure complete synchronization
             syncAllLocalBeersToFirestore()
@@ -132,11 +160,23 @@ class FirebaseBeerRepository(
             if (currentUserId.isBlank()) {
                 currentUserId = getOrCreateStableUserId()
             }
+            _syncState.value = SyncState.Error(e.localizedMessage ?: "Firebase Initialisierungsfehler")
         }
+    }
+
+    suspend fun forceSync() = withContext(Dispatchers.IO) {
+        initFirebase()
     }
 
     private suspend fun ensureUserAuthenticated() {
         val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+        val customId = prefs.getString("custom_user_id", null)
+        if (!customId.isNullOrBlank()) {
+            currentUserId = customId
+            Log.d(tag, "Using stored custom user ID / UUID: $currentUserId")
+            return
+        }
+
         val currentAuth = auth
 
         if (currentAuth != null && isGooglePlayServicesAvailable()) {
@@ -157,6 +197,9 @@ class FirebaseBeerRepository(
                     Log.d(tag, "Signed in anonymously with UID: $currentUserId")
                     return
                 }
+            } catch (e: SecurityException) {
+                Log.w(tag, "GMS SecurityException during anonymous auth (broker/package visibility): ${e.localizedMessage}")
+                auth = null
             } catch (e: Throwable) {
                 Log.w(tag, "Anonymous sign-in or GMS Auth notice: ${e.localizedMessage}")
             }
@@ -169,7 +212,8 @@ class FirebaseBeerRepository(
 
     private fun getOrCreateStableUserId(): String {
         val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
-        var userId = prefs.getString("firebase_user_id", null)
+        var userId = prefs.getString("custom_user_id", null)
+            ?: prefs.getString("firebase_user_id", null)
             ?: prefs.getString("device_user_id", null)
 
         if (userId.isNullOrBlank()) {
@@ -182,43 +226,216 @@ class FirebaseBeerRepository(
         return userId
     }
 
-    private fun startFirestoreListener() {
-        val db = firestore ?: return
-        if (currentUserId.isBlank()) return
+    private fun getAllUserIds(): Set<String> {
+        val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+        val set = mutableSetOf<String>()
+        if (currentUserId.isNotBlank()) set.add(currentUserId)
+        prefs.getString("custom_user_id", null)?.takeIf { it.isNotBlank() }?.let { set.add(it) }
+        prefs.getString("firebase_user_id", null)?.takeIf { it.isNotBlank() }?.let { set.add(it) }
+        prefs.getString("device_user_id", null)?.takeIf { it.isNotBlank() }?.let { set.add(it) }
+        auth?.currentUser?.uid?.takeIf { it.isNotBlank() }?.let { set.add(it) }
+        return set
+    }
 
-        firestoreListener?.remove()
+    suspend fun setCustomUserId(newUserId: String) = withContext(Dispatchers.IO) {
+        val trimmed = newUserId.trim()
+        if (trimmed.isBlank()) return@withContext
+        val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+        currentUserId = trimmed
+        prefs.edit()
+            .putString("custom_user_id", trimmed)
+            .putString("firebase_user_id", trimmed)
+            .apply()
+        Log.d(tag, "Set custom user ID / UUID: $trimmed")
+        startFirestoreListeners()
+        syncAllLocalBeersToFirestore()
+    }
+
+    suspend fun signInWithEmailAndPassword(email: String, pass: String): Result<String> = withContext(Dispatchers.IO) {
+        val currentAuth = auth ?: try {
+            FirebaseAuth.getInstance().also { auth = it }
+        } catch (e: Throwable) {
+            return@withContext Result.failure(Exception("FirebaseAuth nicht verfügbar: ${e.localizedMessage}"))
+        }
 
         try {
-            val userBeersRef = db.collection("users")
-                .document(currentUserId)
-                .collection("beers")
+            val res = currentAuth.signInWithEmailAndPassword(email.trim(), pass).await()
+            val uid = res.user?.uid ?: return@withContext Result.failure(Exception("Anmeldung fehlgeschlagen: Keine UID empfangen"))
+            val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
+            currentUserId = uid
+            prefs.edit()
+                .putString("firebase_user_id", uid)
+                .putString("custom_user_id", uid)
+                .apply()
+            Log.d(tag, "Successfully signed in with email, UID: $uid")
+            startFirestoreListeners()
+            syncAllLocalBeersToFirestore()
+            Result.success(uid)
+        } catch (e: Throwable) {
+            Log.e(tag, "Email sign in error: ${e.localizedMessage}", e)
+            Result.failure(e)
+        }
+    }
 
-            firestoreListener = userBeersRef.addSnapshotListener { snapshots, error ->
-                if (error != null) {
-                    Log.w(tag, "Firestore listen error: ${error.localizedMessage}")
-                    return@addSnapshotListener
+    private fun startFirestoreListeners() {
+        val db = firestore ?: return
+
+        synchronized(activeListeners) {
+            activeListeners.forEach { it.remove() }
+            activeListeners.clear()
+        }
+
+        val remoteMap = ConcurrentHashMap<String, SavedBeerItem>()
+
+        fun processAndMergeSnapshots() {
+            val currentMap = _beersFlow.value.associateBy { it.id }.toMutableMap()
+
+            for ((id, remote) in remoteMap) {
+                // Deduplicate by ID or by Name + Brand
+                val existingByKey = currentMap.values.find {
+                    it.id == id || (it.name.equals(remote.name, ignoreCase = true) &&
+                            (it.brandOrProducer.isNullOrBlank() || remote.brandOrProducer.isNullOrBlank() ||
+                                    it.brandOrProducer.equals(remote.brandOrProducer, ignoreCase = true)))
                 }
 
-                if (snapshots != null) {
-                    val remoteBeers = snapshots.documents.mapNotNull { doc ->
-                        val data = doc.data ?: return@mapNotNull null
-                        SavedBeerItem.fromMap(doc.id, data)
+                if (existingByKey == null) {
+                    currentMap[remote.id] = remote
+                } else {
+                    // Pick the one with higher timestamp or rating/notes
+                    val chosen = if (remote.timestamp > existingByKey.timestamp ||
+                        (remote.rating > existingByKey.rating) ||
+                        (remote.userNotes.isNotBlank() && existingByKey.userNotes.isBlank())
+                    ) {
+                        remote.copy(
+                            id = existingByKey.id,
+                            rating = if (remote.rating > 0f) remote.rating else existingByKey.rating,
+                            userNotes = if (remote.userNotes.isNotBlank()) remote.userNotes else existingByKey.userNotes,
+                            imagePath = remote.imagePath ?: existingByKey.imagePath
+                        )
+                    } else {
+                        existingByKey.copy(
+                            rating = if (existingByKey.rating > 0f) existingByKey.rating else remote.rating,
+                            userNotes = if (existingByKey.userNotes.isNotBlank()) existingByKey.userNotes else remote.userNotes,
+                            imagePath = existingByKey.imagePath ?: remote.imagePath
+                        )
                     }
-
-                    // Smart Merge: combine remote items with any local items
-                    val currentMap = _beersFlow.value.associateBy { it.id }.toMutableMap()
-                    for (remote in remoteBeers) {
-                        currentMap[remote.id] = remote
-                    }
-
-                    val mergedList = currentMap.values.sortedByDescending { it.timestamp }
-                    _beersFlow.value = mergedList
-                    persistLocalCache(mergedList)
+                    currentMap[chosen.id] = chosen
                 }
             }
-        } catch (e: Throwable) {
-            Log.e(tag, "Failed to start Firestore listener: ${e.localizedMessage}", e)
+
+            val mergedList = currentMap.values.sortedByDescending { it.timestamp }
+            _beersFlow.value = mergedList
+            persistLocalCache(mergedList)
+            _syncState.value = SyncState.Success(mergedList.size)
         }
+
+        val userIds = getAllUserIds()
+        val newListeners = mutableListOf<ListenerRegistration>()
+
+        for (uId in userIds) {
+            // Listen to users/$uId/beers
+            try {
+                val userBeersRef = db.collection("users").document(uId).collection("beers")
+                val listener = userBeersRef.addSnapshotListener { snapshots, error ->
+                    if (error != null) {
+                        Log.d(tag, "Listen notice for users/$uId/beers: ${error.localizedMessage}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshots != null) {
+                        for (doc in snapshots.documents) {
+                            val data = doc.data ?: continue
+                            val beer = SavedBeerItem.fromMap(doc.id, data)
+                            if (beer.name.isNotBlank()) {
+                                remoteMap[beer.id] = beer
+                            }
+                        }
+                        processAndMergeSnapshots()
+                    }
+                }
+                newListeners.add(listener)
+            } catch (e: Throwable) {
+                Log.d(tag, "Could not start listener for users/$uId/beers: ${e.localizedMessage}")
+            }
+
+            // Listen to users/$uId/drinks
+            try {
+                val userDrinksRef = db.collection("users").document(uId).collection("drinks")
+                val listener = userDrinksRef.addSnapshotListener { snapshots, error ->
+                    if (error != null) {
+                        Log.d(tag, "Listen notice for users/$uId/drinks: ${error.localizedMessage}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshots != null) {
+                        for (doc in snapshots.documents) {
+                            val data = doc.data ?: continue
+                            val beer = SavedBeerItem.fromMap(doc.id, data)
+                            if (beer.name.isNotBlank()) {
+                                remoteMap[beer.id] = beer
+                            }
+                        }
+                        processAndMergeSnapshots()
+                    }
+                }
+                newListeners.add(listener)
+            } catch (e: Throwable) {
+                Log.d(tag, "Could not start listener for users/$uId/drinks: ${e.localizedMessage}")
+            }
+        }
+
+        // Listen to root collection "beers"
+        try {
+            val globalBeersRef = db.collection("beers")
+            val listener = globalBeersRef.addSnapshotListener { snapshots, error ->
+                if (error != null) {
+                    Log.d(tag, "Global 'beers' listen notice: ${error.localizedMessage}")
+                    return@addSnapshotListener
+                }
+                if (snapshots != null) {
+                    for (doc in snapshots.documents) {
+                        val data = doc.data ?: continue
+                        val beer = SavedBeerItem.fromMap(doc.id, data)
+                        if (beer.name.isNotBlank()) {
+                            remoteMap[beer.id] = beer
+                        }
+                    }
+                    processAndMergeSnapshots()
+                }
+            }
+            newListeners.add(listener)
+        } catch (e: Throwable) {
+            Log.d(tag, "Could not start global 'beers' listener: ${e.localizedMessage}")
+        }
+
+        // Listen to root collection "drinks"
+        try {
+            val globalDrinksRef = db.collection("drinks")
+            val listener = globalDrinksRef.addSnapshotListener { snapshots, error ->
+                if (error != null) {
+                    Log.d(tag, "Global 'drinks' listen notice: ${error.localizedMessage}")
+                    return@addSnapshotListener
+                }
+                if (snapshots != null) {
+                    for (doc in snapshots.documents) {
+                        val data = doc.data ?: continue
+                        val beer = SavedBeerItem.fromMap(doc.id, data)
+                        if (beer.name.isNotBlank()) {
+                            remoteMap[beer.id] = beer
+                        }
+                    }
+                    processAndMergeSnapshots()
+                }
+            }
+            newListeners.add(listener)
+        } catch (e: Throwable) {
+            Log.d(tag, "Could not start global 'drinks' listener: ${e.localizedMessage}")
+        }
+
+        synchronized(activeListeners) {
+            activeListeners.addAll(newListeners)
+        }
+
+        // Initial process call to ensure sync state succeeds even if empty
+        processAndMergeSnapshots()
     }
 
     private fun loadLocalCache() {
@@ -274,7 +491,7 @@ class FirebaseBeerRepository(
         _beersFlow.value = updatedList
         persistLocalCache(updatedList)
 
-        // Sync with Firestore (awaits initialization first if still initializing)
+        // Sync with Firestore
         syncBeerToFirestore(beerItem)
 
         beerItem
@@ -322,13 +539,17 @@ class FirebaseBeerRepository(
 
         try {
             val db = firestore
-            if (db != null && currentUserId.isNotBlank()) {
-                db.collection("users")
-                    .document(currentUserId)
-                    .collection("beers")
-                    .document(beerId)
-                    .delete()
-                    .await()
+            if (db != null) {
+                for (uId in getAllUserIds()) {
+                    try {
+                        db.collection("users").document(uId).collection("beers").document(beerId).delete()
+                        db.collection("users").document(uId).collection("drinks").document(beerId).delete()
+                    } catch (_: Throwable) {}
+                }
+                try {
+                    db.collection("beers").document(beerId).delete()
+                    db.collection("drinks").document(beerId).delete()
+                } catch (_: Throwable) {}
                 Log.d(tag, "Successfully deleted beer $beerId from Firestore")
             }
         } catch (e: Throwable) {
@@ -341,16 +562,33 @@ class FirebaseBeerRepository(
 
         try {
             val db = firestore
-            if (db != null && currentUserId.isNotBlank()) {
-                db.collection("users")
-                    .document(currentUserId)
-                    .collection("beers")
-                    .document(beer.id)
-                    .set(beer.toMap(), SetOptions.merge())
-                    .await()
-                Log.d(tag, "Successfully synced beer '${beer.name}' (${beer.id}) to Firestore under user $currentUserId")
+            if (db != null) {
+                val mapData = beer.toMap()
+                val userIds = getAllUserIds()
+
+                for (uId in userIds) {
+                    try {
+                        db.collection("users")
+                            .document(uId)
+                            .collection("beers")
+                            .document(beer.id)
+                            .set(mapData, SetOptions.merge())
+                    } catch (e: Throwable) {
+                        Log.d(tag, "Sync to users/$uId/beers notice: ${e.localizedMessage}")
+                    }
+                }
+
+                try {
+                    db.collection("beers")
+                        .document(beer.id)
+                        .set(mapData, SetOptions.merge())
+                } catch (e: Throwable) {
+                    Log.d(tag, "Sync to root beers notice: ${e.localizedMessage}")
+                }
+
+                Log.d(tag, "Successfully synced beer '${beer.name}' (${beer.id}) to Firestore")
             } else {
-                Log.w(tag, "Cannot sync beer to Firestore: db=$db, currentUserId='$currentUserId'")
+                Log.w(tag, "Cannot sync beer to Firestore: db is null")
             }
         } catch (e: Throwable) {
             Log.e(tag, "Failed to sync beer '${beer.name}' to Firestore: ${e.localizedMessage}", e)
@@ -379,18 +617,8 @@ class FirebaseBeerRepository(
             Log.d(tag, "Successfully batch-synced ${localList.size} local beers to Firestore")
         } catch (e: Throwable) {
             Log.w(tag, "Batch sync local beers notice: ${e.localizedMessage}")
-            // Fallback: sync individually
             for (beer in localList) {
-                try {
-                    db.collection("users")
-                        .document(currentUserId)
-                        .collection("beers")
-                        .document(beer.id)
-                        .set(beer.toMap(), SetOptions.merge())
-                        .await()
-                } catch (indivEx: Throwable) {
-                    Log.w(tag, "Individual sync for '${beer.name}' notice: ${indivEx.localizedMessage}")
-                }
+                syncBeerToFirestore(beer)
             }
         }
     }

@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.picscan.app.data.repository.SyncState
+
 data class ScannerUiState(
     val isAnalyzing: Boolean = false,
     val currentDrink: DrinkDetails? = null,
@@ -41,6 +43,34 @@ class ScannerViewModel(
 
     private val _uiState = MutableStateFlow(ScannerUiState())
     val uiState: StateFlow<ScannerUiState> = _uiState.asStateFlow()
+
+    val syncState: StateFlow<SyncState> = beerRepo.syncState.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SyncState.Syncing
+    )
+
+    val currentUserId: String
+        get() = beerRepo.userId
+
+    fun refreshFirebaseSync() {
+        viewModelScope.launch {
+            beerRepo.forceSync()
+        }
+    }
+
+    fun setCustomUserId(newUserId: String) {
+        viewModelScope.launch {
+            beerRepo.setCustomUserId(newUserId)
+        }
+    }
+
+    fun signInWithEmailAndPassword(email: String, pass: String, onResult: (Result<String>) -> Unit) {
+        viewModelScope.launch {
+            val res = beerRepo.signInWithEmailAndPassword(email, pass)
+            onResult(res)
+        }
+    }
 
     val apiKey: StateFlow<String> = apiKeyRepo.apiKeyFlow.stateIn(
         scope = viewModelScope,

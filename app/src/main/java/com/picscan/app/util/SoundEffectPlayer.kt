@@ -17,12 +17,193 @@ import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.sin
 
+import android.media.MediaPlayer
+import android.util.Log
+import com.picscan.app.R
+import java.io.File
+
 object SoundEffectPlayer {
 
     private val audioScope = CoroutineScope(Dispatchers.Default)
+    private var activeMediaPlayer: MediaPlayer? = null
+    private val playerMutex = Any()
 
     /**
-     * Plays the appropriate synthesized sound effect and haptics for the specified BeerVerdict tier.
+     * Stops and releases any currently active MediaPlayer.
+     */
+    fun stop() {
+        synchronized(playerMutex) {
+            try {
+                activeMediaPlayer?.let { player ->
+                    if (player.isPlaying) {
+                        player.stop()
+                    }
+                    player.release()
+                }
+            } catch (_: Exception) {}
+            activeMediaPlayer = null
+        }
+    }
+
+    /**
+     * Plays an MP3 file using the best available source:
+     * 1. Direct host absolute file path (if readable on the system)
+     * 2. Android raw resource (bundled inside APK)
+     * 3. Android asset file (sound/<filename>)
+     * 4. Synthesizer fallback if playback could not be started
+     */
+    private fun playAudioFile(
+        context: Context?,
+        rawResId: Int,
+        assetRelativePath: String,
+        directFilePath: String,
+        fallbackSynthesizer: () -> Unit
+    ) {
+        synchronized(playerMutex) {
+            try {
+                activeMediaPlayer?.let { player ->
+                    try {
+                        if (player.isPlaying) {
+                            player.stop()
+                        }
+                    } catch (_: Exception) {}
+                    try {
+                        player.release()
+                    } catch (_: Exception) {}
+                }
+                activeMediaPlayer = null
+
+                // 1. Direct host file check
+                val directFile = File(directFilePath)
+                if (directFile.exists() && directFile.canRead()) {
+                    try {
+                        val player = MediaPlayer().apply {
+                            setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            setDataSource(directFile.absolutePath)
+                            setOnCompletionListener { mp ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            setOnErrorListener { mp, _, _ ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                                true
+                            }
+                            prepare()
+                            start()
+                        }
+                        activeMediaPlayer = player
+                        return
+                    } catch (e: Exception) {
+                        Log.w("SoundEffectPlayer", "Direct file playback failed for $directFilePath", e)
+                    }
+                }
+
+                // 2. Android raw resource bundled in APK
+                if (context != null) {
+                    try {
+                        val player = MediaPlayer.create(context, rawResId)
+                        if (player != null) {
+                            player.setOnCompletionListener { mp ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            player.setOnErrorListener { mp, _, _ ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                                true
+                            }
+                            player.start()
+                            activeMediaPlayer = player
+                            return
+                        }
+                    } catch (e: Exception) {
+                        Log.w("SoundEffectPlayer", "Raw resource playback failed for $rawResId", e)
+                    }
+
+                    // 3. Android asset file
+                    try {
+                        val afd = context.assets.openFd(assetRelativePath)
+                        val player = MediaPlayer().apply {
+                            setAudioAttributes(
+                                AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build()
+                            )
+                            setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                            afd.close()
+                            setOnCompletionListener { mp ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                            setOnErrorListener { mp, _, _ ->
+                                synchronized(playerMutex) {
+                                    try {
+                                        mp.release()
+                                        if (activeMediaPlayer == mp) {
+                                            activeMediaPlayer = null
+                                        }
+                                    } catch (_: Exception) {}
+                                }
+                                true
+                            }
+                            prepare()
+                            start()
+                        }
+                        activeMediaPlayer = player
+                        return
+                    } catch (e: Exception) {
+                        Log.w("SoundEffectPlayer", "Asset playback failed for $assetRelativePath", e)
+                    }
+                }
+
+                // Fallback to synthesized audio
+                fallbackSynthesizer()
+            } catch (e: Exception) {
+                Log.e("SoundEffectPlayer", "Error during sound playback", e)
+                fallbackSynthesizer()
+            }
+        }
+    }
+
+    /**
+     * Plays the appropriate sound effect and haptics for the specified BeerVerdict tier.
      */
     fun playBeerVerdictSound(verdict: BeerVerdict, context: Context? = null) {
         when (verdict) {
@@ -36,9 +217,22 @@ object SoundEffectPlayer {
     }
 
     /**
-     * Tier 1: Hopfenbombe - Epic, energetic explosive fanfare sweep with sparkling overtones.
+     * Tier 1: Hopfenbombe (Beste Bier-Bewertung)
+     * Plays: Voicy_Feuball Junge, BAM!.mp3
      */
     fun playHopfenbombeSound(context: Context? = null) {
+        playAudioFile(
+            context = context,
+            rawResId = R.raw.voicy_feuball_junge_bam,
+            assetRelativePath = "sound/Voicy_Feuball Junge, BAM!.mp3",
+            directFilePath = "/home/joachim/IdeaProjects/picscan/sound/Voicy_Feuball Junge, BAM!.mp3",
+            fallbackSynthesizer = { playSynthesizedHopfenbombe() }
+        )
+
+        context?.let { triggerExplosionVibration(it) }
+    }
+
+    private fun playSynthesizedHopfenbombe() {
         audioScope.launch {
             try {
                 val sampleRate = 44100
@@ -79,14 +273,25 @@ object SoundEffectPlayer {
                 playPcmAudio(audioData, sampleRate)
             } catch (_: Exception) {}
         }
-
-        context?.let { triggerExplosionVibration(it) }
     }
 
     /**
-     * Tier 2: Lecker Bierchen - Cheerful, bright fanfare arpeggio (C5 -> E5 -> G5 -> C6).
+     * Tier 2: Lecker Bierchen (Zweitbeste Bier-Bewertung)
+     * Plays: fickschnitzl.mp3
      */
     fun playLeckerBierchenSound(context: Context? = null) {
+        playAudioFile(
+            context = context,
+            rawResId = R.raw.fickschnitzl,
+            assetRelativePath = "sound/fickschnitzl.mp3",
+            directFilePath = "/home/joachim/IdeaProjects/picscan/sound/fickschnitzl.mp3",
+            fallbackSynthesizer = { playSynthesizedLeckerBierchen() }
+        )
+
+        context?.let { triggerCelebrationVibration(it) }
+    }
+
+    private fun playSynthesizedLeckerBierchen() {
         audioScope.launch {
             try {
                 val sampleRate = 44100
@@ -135,8 +340,6 @@ object SoundEffectPlayer {
                 playPcmAudio(audioData, sampleRate)
             } catch (_: Exception) {}
         }
-
-        context?.let { triggerCelebrationVibration(it) }
     }
 
     /**

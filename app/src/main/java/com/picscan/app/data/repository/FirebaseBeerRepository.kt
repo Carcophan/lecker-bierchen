@@ -2,6 +2,8 @@ package com.picscan.app.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -67,6 +69,22 @@ class FirebaseBeerRepository(
         }
     }
 
+    private fun isGooglePlayServicesAvailable(): Boolean {
+        return try {
+            val availability = GoogleApiAvailability.getInstance()
+            val result = availability.isGooglePlayServicesAvailable(context)
+            if (result != ConnectionResult.SUCCESS) {
+                Log.w(tag, "Google Play Services unavailable. ConnectionResult code: $result")
+                false
+            } else {
+                true
+            }
+        } catch (e: Throwable) {
+            Log.w(tag, "Google Play Services check notice: ${e.localizedMessage}")
+            false
+        }
+    }
+
     private suspend fun ensureInitialized() {
         if (!initJob.isCompleted) {
             initJob.join()
@@ -79,18 +97,29 @@ class FirebaseBeerRepository(
                 FirebaseApp.initializeApp(context)
             }
 
-            auth = FirebaseAuth.getInstance()
-            firestore = FirebaseFirestore.getInstance().apply {
-                // Ensure persistent local cache is enabled for robust offline support
+            if (isGooglePlayServicesAvailable()) {
                 try {
-                    val settings = FirebaseFirestoreSettings.Builder()
-                        .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
-                        .build()
-                    firestoreSettings = settings
-                } catch (e: Exception) {
-                    // Settings can only be set before any other Firestore operations
-                    Log.d(tag, "Firestore settings notice: ${e.localizedMessage}")
+                    auth = FirebaseAuth.getInstance()
+                } catch (e: Throwable) {
+                    Log.w(tag, "FirebaseAuth initialization notice: ${e.localizedMessage}")
                 }
+            } else {
+                Log.i(tag, "Google Play Services not available, using device storage fallback ID")
+            }
+
+            try {
+                firestore = FirebaseFirestore.getInstance().apply {
+                    try {
+                        val settings = FirebaseFirestoreSettings.Builder()
+                            .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
+                            .build()
+                        firestoreSettings = settings
+                    } catch (e: Throwable) {
+                        Log.d(tag, "Firestore settings notice: ${e.localizedMessage}")
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.w(tag, "Firestore initialization notice: ${e.localizedMessage}")
             }
 
             ensureUserAuthenticated()
@@ -98,7 +127,7 @@ class FirebaseBeerRepository(
 
             // Push any locally cached beers to Firestore to ensure complete synchronization
             syncAllLocalBeersToFirestore()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(tag, "Firebase initialization error: ${e.localizedMessage}", e)
             if (currentUserId.isBlank()) {
                 currentUserId = getOrCreateStableUserId()
@@ -110,16 +139,16 @@ class FirebaseBeerRepository(
         val prefs = context.getSharedPreferences("picscan_user_prefs", Context.MODE_PRIVATE)
         val currentAuth = auth
 
-        if (currentAuth != null) {
-            val existingUser = currentAuth.currentUser
-            if (existingUser != null) {
-                currentUserId = existingUser.uid
-                prefs.edit().putString("firebase_user_id", currentUserId).apply()
-                Log.d(tag, "Authenticated with existing user UID: $currentUserId")
-                return
-            }
-
+        if (currentAuth != null && isGooglePlayServicesAvailable()) {
             try {
+                val existingUser = currentAuth.currentUser
+                if (existingUser != null) {
+                    currentUserId = existingUser.uid
+                    prefs.edit().putString("firebase_user_id", currentUserId).apply()
+                    Log.d(tag, "Authenticated with existing user UID: $currentUserId")
+                    return
+                }
+
                 val result = currentAuth.signInAnonymously().await()
                 val uid = result.user?.uid
                 if (!uid.isNullOrBlank()) {
@@ -128,8 +157,8 @@ class FirebaseBeerRepository(
                     Log.d(tag, "Signed in anonymously with UID: $currentUserId")
                     return
                 }
-            } catch (e: Exception) {
-                Log.w(tag, "Anonymous sign-in unavailable or failed: ${e.localizedMessage}")
+            } catch (e: Throwable) {
+                Log.w(tag, "Anonymous sign-in or GMS Auth notice: ${e.localizedMessage}")
             }
         }
 
@@ -187,7 +216,7 @@ class FirebaseBeerRepository(
                     persistLocalCache(mergedList)
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(tag, "Failed to start Firestore listener: ${e.localizedMessage}", e)
         }
     }
@@ -202,7 +231,7 @@ class FirebaseBeerRepository(
             val content = localCacheFile.readText()
             val list = json.decodeFromString<List<SavedBeerItem>>(content)
             _beersFlow.value = list.sortedByDescending { it.timestamp }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "Failed to read local beer cache: ${e.localizedMessage}")
             _beersFlow.value = emptyList()
         }
@@ -212,7 +241,7 @@ class FirebaseBeerRepository(
         try {
             val serialized = json.encodeToString(list)
             localCacheFile.writeText(serialized)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "Failed to write local beer cache: ${e.localizedMessage}")
         }
     }
@@ -302,7 +331,7 @@ class FirebaseBeerRepository(
                     .await()
                 Log.d(tag, "Successfully deleted beer $beerId from Firestore")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(tag, "Failed to delete beer from Firestore: ${e.localizedMessage}", e)
         }
     }
@@ -323,7 +352,7 @@ class FirebaseBeerRepository(
             } else {
                 Log.w(tag, "Cannot sync beer to Firestore: db=$db, currentUserId='$currentUserId'")
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.e(tag, "Failed to sync beer '${beer.name}' to Firestore: ${e.localizedMessage}", e)
         }
     }
@@ -348,7 +377,7 @@ class FirebaseBeerRepository(
 
             batch.commit().await()
             Log.d(tag, "Successfully batch-synced ${localList.size} local beers to Firestore")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "Batch sync local beers notice: ${e.localizedMessage}")
             // Fallback: sync individually
             for (beer in localList) {
@@ -359,7 +388,7 @@ class FirebaseBeerRepository(
                         .document(beer.id)
                         .set(beer.toMap(), SetOptions.merge())
                         .await()
-                } catch (indivEx: Exception) {
+                } catch (indivEx: Throwable) {
                     Log.w(tag, "Individual sync for '${beer.name}' notice: ${indivEx.localizedMessage}")
                 }
             }

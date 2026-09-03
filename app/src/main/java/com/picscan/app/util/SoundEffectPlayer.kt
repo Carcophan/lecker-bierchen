@@ -343,9 +343,22 @@ object SoundEffectPlayer {
     }
 
     /**
-     * Tier 3: Wegbier - Crisp, jaunty walking melody with pop/clink feel (G4 -> C5 -> E5).
+     * Tier 3: Wegbier (Drittbeste Bier-Bewertung)
+     * Plays: New kids Schultenbräu ! (128kbit_AAC).m4a
      */
     fun playWegbierSound(context: Context? = null) {
+        playAudioFile(
+            context = context,
+            rawResId = R.raw.new_kids_schultenbraeu,
+            assetRelativePath = "sound/New kids Schultenbräu ! (128kbit_AAC).m4a",
+            directFilePath = "/home/joachim/IdeaProjects/picscan/sound/New kids Schultenbräu ! (128kbit_AAC).m4a",
+            fallbackSynthesizer = { playSynthesizedWegbier() }
+        )
+
+        context?.let { triggerWegbierVibration(it) }
+    }
+
+    private fun playSynthesizedWegbier() {
         audioScope.launch {
             try {
                 val sampleRate = 44100
@@ -370,8 +383,6 @@ object SoundEffectPlayer {
                 playPcmAudio(audioData, sampleRate)
             } catch (_: Exception) {}
         }
-
-        context?.let { triggerWegbierVibration(it) }
     }
 
     /**

@@ -405,7 +405,7 @@ fun CameraScanScreen(
                             strokeWidth = 4.dp
                         )
                         Text(
-                            text = "Getränk wird mit Google AI analysiert…",
+                            text = "Getränk wird mit lecker Bierchen! analysiert…",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center

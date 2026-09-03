@@ -55,8 +55,9 @@ class FirebaseBeerRepositoryTest {
     }
 
     @Test
-    fun testIsSameDrink_differentBrandsAreNotEqual() {
-        assertFalse(
+    fun testIsSameDrink_identicalNameIsDuplicateRegardlessOfBrand() {
+        // According to requirement: A drink is considered a duplicate if the name is identical
+        assertTrue(
             FirebaseBeerRepository.isSameDrink(
                 nameA = "Helles",
                 brandA = "Augustiner",
@@ -64,6 +65,16 @@ class FirebaseBeerRepositoryTest {
                 brandB = "Tegernseer"
             )
         )
+    }
+
+    @Test
+    fun testIsDuplicateName_exactAndNormalized() {
+        assertTrue(FirebaseBeerRepository.isDuplicateName("Augustiner Helles", "Augustiner Helles"))
+        assertTrue(FirebaseBeerRepository.isDuplicateName("  augustiner helles  ", "AUGUSTINER HELLES"))
+        assertTrue(FirebaseBeerRepository.isDuplicateName("Paulaner Hefe-Weißbier", "Paulaner Hefe-Weissbier"))
+        assertTrue(FirebaseBeerRepository.isDuplicateName("Corona Extra", "corona extra"))
+        assertFalse(FirebaseBeerRepository.isDuplicateName("Augustiner Helles", "Augustiner Edelstoff"))
+        assertFalse(FirebaseBeerRepository.isDuplicateName("Beck's", "Beck's Gold"))
     }
 
     @Test

@@ -30,6 +30,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.text.Normalizer
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -359,6 +361,8 @@ class FirebaseBeerRepository(
             _syncState.value = SyncState.Success(mergedList.size)
 
             if (duplicateIds.isNotEmpty()) {
+                deletedBeerIds.addAll(duplicateIds)
+                persistDeletedBeerIds()
                 coroutineScope.launch {
                     val db = firestore ?: return@launch
                     for (dupId in duplicateIds) {
@@ -590,6 +594,7 @@ class FirebaseBeerRepository(
         userNotes: String = "",
         imageBase64: String? = null
     ): SavedBeerItem = withContext(Dispatchers.IO) {
+        ensureInitialized()
         val existingItem = findMatchingBeer(drink)
 
         // If this drink is already in the database:
@@ -861,15 +866,22 @@ class FirebaseBeerRepository(
     }
 
     fun findMatchingBeer(drink: DrinkDetails): SavedBeerItem? {
-        return _beersFlow.value.find { saved ->
-            isSameDrink(saved.name, saved.brandOrProducer, drink.name, drink.brandOrProducer)
-        }
+        return findMatchingBeer(drink.name, drink.brandOrProducer)
     }
 
-    fun findMatchingBeer(name: String, brand: String?): SavedBeerItem? {
-        return _beersFlow.value.find { saved ->
+    fun findMatchingBeer(name: String, brand: String? = null): SavedBeerItem? {
+        val inFlow = _beersFlow.value.find { saved ->
             isSameDrink(saved.name, saved.brandOrProducer, name, brand)
         }
+        if (inFlow != null) return inFlow
+
+        for (docMap in collectionDocs.values) {
+            val inDocs = docMap.values.find { saved ->
+                saved.id !in deletedBeerIds && isSameDrink(saved.name, saved.brandOrProducer, name, brand)
+            }
+            if (inDocs != null) return inDocs
+        }
+        return null
     }
 
     fun findSavedBeerByName(name: String): SavedBeerItem? {
@@ -878,14 +890,31 @@ class FirebaseBeerRepository(
 
     companion object {
         fun normalizeString(str: String?): String {
-            if (str == null) return ""
-            return str.trim()
-                .lowercase()
+            if (str.isNullOrBlank()) return ""
+            val germanReplaced = str.trim()
+                .lowercase(Locale.ROOT)
                 .replace("ä", "ae")
                 .replace("ö", "oe")
                 .replace("ü", "ue")
                 .replace("ß", "ss")
+            val decomposed = Normalizer.normalize(germanReplaced, Normalizer.Form.NFD)
+            return decomposed
+                .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
                 .replace(Regex("[^a-z0-9]"), "")
+        }
+
+        /**
+         * Returns true if two drink names are identical (case-insensitive and whitespace/punctuation/diacritics normalized).
+         * A drink is considered a duplicate if the name is identical.
+         */
+        fun isDuplicateName(nameA: String?, nameB: String?): Boolean {
+            if (nameA.isNullOrBlank() || nameB.isNullOrBlank()) return false
+            val trimA = nameA.trim()
+            val trimB = nameB.trim()
+            if (trimA.equals(trimB, ignoreCase = true)) return true
+            val normA = normalizeString(trimA)
+            val normB = normalizeString(trimB)
+            return normA.isNotEmpty() && normA == normB
         }
 
         fun isSameDrink(
@@ -894,6 +923,11 @@ class FirebaseBeerRepository(
             nameB: String,
             brandB: String?
         ): Boolean {
+            // Rule: A drink is considered a duplicate if the name is identical.
+            // Duplicates must not be added to the database.
+            if (isDuplicateName(nameA, nameB)) return true
+
+            // Also check variations where brand is prepended to the name in one entry
             val normNameA = normalizeString(nameA)
             val normNameB = normalizeString(nameB)
             if (normNameA.isEmpty() || normNameB.isEmpty()) return false
@@ -901,24 +935,16 @@ class FirebaseBeerRepository(
             val normBrandA = normalizeString(brandA)
             val normBrandB = normalizeString(brandB)
 
-            // Direct normalized name match
-            if (normNameA == normNameB) {
-                if (normBrandA.isNotEmpty() && normBrandB.isNotEmpty()) {
-                    return normBrandA == normBrandB || normBrandA.contains(normBrandB) || normBrandB.contains(normBrandA)
-                }
-                return true
-            }
+            val cleanNameA = if (normBrandA.isNotEmpty() && normNameA.startsWith(normBrandA)) {
+                normNameA.removePrefix(normBrandA)
+            } else normNameA
+            val cleanNameB = if (normBrandB.isNotEmpty() && normNameB.startsWith(normBrandB)) {
+                normNameB.removePrefix(normBrandB)
+            } else normNameB
 
-            // Combined brand + name checks (handles cases where brand is prepended to name or separate)
-            val comboA = if (normBrandA.isNotEmpty() && !normNameA.contains(normBrandA)) normBrandA + normNameA else normNameA
-            val comboB = if (normBrandB.isNotEmpty() && !normNameB.contains(normBrandB)) normBrandB + normNameB else normNameB
-
-            if (comboA == comboB) return true
-
-            if (comboA.contains(comboB) || comboB.contains(comboA)) {
-                val lenDiff = Math.abs(comboA.length - comboB.length)
-                if (lenDiff <= 6) return true
-            }
+            if (cleanNameA.isNotEmpty() && cleanNameA == cleanNameB) return true
+            if (cleanNameA.isNotEmpty() && cleanNameA == normNameB) return true
+            if (cleanNameB.isNotEmpty() && cleanNameB == normNameA) return true
 
             return false
         }

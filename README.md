@@ -33,7 +33,7 @@
 
 ### So nutzt du Google Gemini AI für lecker Bierchen! (Kostenlos!):
 1. Google stellt Entwickler-APIs über das **[Google AI Studio](https://aistudio.google.com/)** bereit.
-2. **Google AI Studio bietet ein kostenloses Kontingent**, das viele Scans pro Minute für alle Gemini-Modelle erlaubt (Gemini 3.6 Flash / Gemini 2.0 Flash / Gemini 1.5 Flash / Gemini 1.5 Pro).
+2. **Google AI Studio bietet ein kostenloses Kontingent**, das viele Scans pro Minute für alle Gemini-Modelle erlaubt (Gemini 3.8 Flash / Gemini 2.0 Flash / Gemini 1.5 Flash / Gemini 1.5 Pro).
 3. **Schritte zum Erstellen deines Schlüssels:**
    - Gehe zu [Google AI Studio API Keys](https://aistudio.google.com/app/apikey).
    - Melde dich mit deinem Google-Konto an.
@@ -143,7 +143,7 @@ cd /home/joachim/IdeaProjects/picscan
   - 🥫 **Pennerglück** (Discounter-Dose)
   - ☣️ **Pissbrühe** (Plörre / Notstand)
 - 🤖 **Gemini Modell-Auswahl**:
-  - `gemini-3.6-flash` (Neuestes High-Speed-Modell – Standard)
+  - `gemini-3.8-flash` (Neuestes High-Speed-Modell – Standard)
   - `gemini-2.0-flash` (Ultra-schnell & multimodal)
   - `gemini-1.5-flash` (Schnell & ressourcenschonend)
   - `gemini-1.5-pro` (Tiefgehende Sommelier- & Mixologie-Analyse)

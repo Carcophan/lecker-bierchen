@@ -18,9 +18,9 @@ class ApiKeyPreferenceRepository(private val context: Context) {
         val KEY_GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
         val KEY_SELECTED_MODEL = stringPreferencesKey("selected_model")
         
-        const val DEFAULT_MODEL = "gemini-3.6-flash"
+        const val DEFAULT_MODEL = "gemini-3.8-flash"
         val AVAILABLE_MODELS = listOf(
-            "gemini-3.6-flash" to "Gemini 3.6 Flash (Neuestes High-Speed-Modell)",
+            "gemini-3.8-flash" to "Gemini 3.8 Flash (Neuestes High-Speed-Modell)",
         )
     }
 
@@ -34,7 +34,12 @@ class ApiKeyPreferenceRepository(private val context: Context) {
     }
 
     val selectedModelFlow: Flow<String> = context.dataStore.data.map { preferences ->
-        preferences[KEY_SELECTED_MODEL] ?: DEFAULT_MODEL
+        val savedModel = preferences[KEY_SELECTED_MODEL]
+        if (savedModel != null && AVAILABLE_MODELS.any { it.first == savedModel }) {
+            savedModel
+        } else {
+            DEFAULT_MODEL
+        }
     }
 
     suspend fun saveApiKey(apiKey: String) {

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,7 +24,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,7 +32,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.picscan.app.data.model.BeerVerdict
 import com.picscan.app.data.model.DrinkDetails
-import com.picscan.app.util.SoundEffectPlayer
 
 private data class VerdictVisualConfig(
     val primaryColor: Color,
@@ -132,7 +129,6 @@ fun BeerVerdictCard(
     val verdict = remember(drink) { drink.resolveBeerVerdict() }
     if (verdict == BeerVerdict.NONE) return
 
-    val context = LocalContext.current
     val config = remember(verdict) { getVisualConfig(verdict) }
 
     // Subtle ambient breathing animation
@@ -199,7 +195,6 @@ fun BeerVerdictCard(
             .scale(pulseScale)
             .offset(x = shakeOffset.dp)
             .clickable {
-                SoundEffectPlayer.playBeerVerdictSound(verdict, context)
                 onShowFullAlert()
             },
         shape = RoundedCornerShape(20.dp),
@@ -264,41 +259,21 @@ fun BeerVerdictCard(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            FilledTonalButton(
+                onClick = onShowFullAlert,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = config.buttonColor,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                FilledTonalButton(
-                    onClick = {
-                        SoundEffectPlayer.playBeerVerdictSound(verdict, context)
-                    },
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = config.buttonColor,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                        contentDescription = "Play Sound Effect",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Sound abspielen", fontWeight = FontWeight.Bold)
-                }
-
-                OutlinedButton(
-                    onClick = onShowFullAlert,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Fullscreen,
-                        contentDescription = "Animation",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Animation")
-                }
+                Icon(
+                    imageVector = Icons.Default.Fullscreen,
+                    contentDescription = "Animation",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Animation anzeigen", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -315,14 +290,7 @@ fun BeerVerdictCelebrationDialog(
     val verdict = remember(drink) { drink.resolveBeerVerdict() }
     if (verdict == BeerVerdict.NONE) return
 
-    val context = LocalContext.current
     val config = remember(verdict) { getVisualConfig(verdict) }
-
-    // Play sound automatically when dialog opens
-    LaunchedEffect(verdict) {
-        SoundEffectPlayer.playBeerVerdictSound(verdict, context)
-    }
-
     val infiniteTransition = rememberInfiniteTransition(label = "fullscreenBeerAlert")
 
     // Gentle atmospheric background glow
@@ -509,24 +477,11 @@ fun BeerVerdictCelebrationDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Action buttons inside dialog
-                Row(
+                // Action button inside dialog
+                Box(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                    contentAlignment = Alignment.Center
                 ) {
-                    Button(
-                        onClick = {
-                            SoundEffectPlayer.playBeerVerdictSound(verdict, context)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = config.buttonColor
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Nochmal Sound!", fontWeight = FontWeight.Bold)
-                    }
 
                     Button(
                         onClick = onDismiss,

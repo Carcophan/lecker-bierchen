@@ -6,23 +6,23 @@
 
 ## 🍺 5-Stufiges Bier-Ranking ("Hopfenbombe" bis "Pissbrühe")
 
-**lecker Bierchen!** beinhaltet eine humorvolle und intelligente 5-stufige Bier-Bewertung mit individuellen Sound-Effekten, Haptik-Vibrationen und Fullscreen-Animationen:
+**lecker Bierchen!** beinhaltet eine humorvolle und intelligente 5-stufige Bier-Bewertung mit individuellen Fullscreen-Animationen und visuellen Effekten:
 
 1. 💣💥 **"Hopfenbombe!"** (Rang 1/5 – Meisterwerk):
    - Für außergewöhnliche Craft-Biere, intensive Double/Triple IPAs, Imperial Stouts, Trappistenbiere und hopfenintensive Spezialitäten.
-   - *Effekt*: Energetischer Explosions-Sweep & Akkord, dezente Schwingung und Hopfen/Bomben-Partikel.
+   - *Effekt*: Energetische Explosions-Animation, dynamischer Farb-Glow und Hopfen/Bomben-Partikel.
 2. 🍺✨ **"Lecker Bierchen!"** (Rang 2/5 – Hohe Braukunst):
    - Für hervorragende traditionelle Qualitätsbiere und beliebte Klassiker (z. B. Augustiner, Tegernseer, Weihenstephaner, Rothaus, Paulaner, Guinness, Chiemseer etc.).
-   - *Effekt*: Feierliches Fanfaren-Arpeggio, sanfter Amber-Glow und Bierkrug-Sparkles.
+   - *Effekt*: Feierlicher Amber-Glow und Bierkrug-Sparkles.
 3. 🚶‍♂️🍻 **"Wegbier!"** (Rang 3/5 – Kiosk- & Späti-Held):
    - Für solide, süffige Alltags-Lager und Späti-Begleiter (z. B. Astra, Sternburg, Krombacher, Bitburger, Beck's, Jever, Flensburger etc.).
-   - *Effekt*: Fröhlich-beschwingte Walking-Melodie und dynamische Cyan-Vibrationen.
+   - *Effekt*: Dynamischer Cyan-Glow und Gehweg-Vibes.
 4. 🥫🥴 **"Pennerglück!"** (Rang 4/5 – Sparfuchs-Dosenkracher):
    - Für kultiges, günstiges Discounter-Dosenbier (z. B. Oettinger, 5,0 Original, Hansa Pils, Paderborner, Karlskrone, Turmbräu etc.).
-   - *Effekt*: Wonky metallisches Dosen-Klimpern und dezente Dosen-Animation.
+   - *Effekt*: Wonky metallischer Bronze-Look und Dosen-Animation.
 5. ☣️🤢 **"Pissbrühe!"** (Rang 5/5 – Untrinkbare Plörre):
    - Für wässrige, abgestandene Plörre und gefürchtete Billigst-Plempe (z. B. Perlenbacher, Natty Light, Keystone Light etc.).
-   - *Effekt*: Dissonanter Fail-Buzzer, toxisch-grüner Alarm-Glow und sanftes Warnsignal.
+   - *Effekt*: Toxisch-grüner Alarm-Glow und animiertes Warnsignal.
 
 ---
 

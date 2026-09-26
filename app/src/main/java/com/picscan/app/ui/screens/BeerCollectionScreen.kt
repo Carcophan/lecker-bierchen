@@ -34,6 +34,7 @@ import com.picscan.app.data.model.BeerVerdict
 import com.picscan.app.data.model.SavedBeerItem
 import com.picscan.app.data.repository.SyncState
 import com.picscan.app.ui.components.DrinkCategoryBadge
+import com.picscan.app.ui.components.BreweryLocationMapBottomSheet
 import com.picscan.app.ui.viewmodel.ScannerViewModel
 import com.picscan.app.util.ImageUtils
 import java.io.File
@@ -70,6 +71,17 @@ fun BeerCollectionScreen(
     // Dialog state for editing rating and notes
     var beerToEdit by remember { mutableStateOf<SavedBeerItem?>(null) }
     var beerToDelete by remember { mutableStateOf<SavedBeerItem?>(null) }
+    var beerForMap by remember { mutableStateOf<SavedBeerItem?>(null) }
+
+    // Display interactive map bottom sheet for selected beer
+    if (beerForMap != null && !beerForMap!!.origin.isNullOrBlank()) {
+        BreweryLocationMapBottomSheet(
+            beerName = beerForMap!!.name,
+            brandOrProducer = beerForMap!!.brandOrProducer,
+            origin = beerForMap!!.origin!!,
+            onDismiss = { beerForMap = null }
+        )
+    }
 
     val filteredList = remember(currentList, searchQuery, selectedVerdictFilter, selectedSortOption) {
         var result = currentList
@@ -410,6 +422,9 @@ fun BeerCollectionScreen(
                             },
                             onDelete = {
                                 beerToDelete = beer
+                            },
+                            onShowMap = {
+                                beerForMap = beer
                             }
                         )
                     }
@@ -534,7 +549,8 @@ fun SavedBeerCard(
     onCardClick: () -> Unit,
     onToggleStatus: () -> Unit,
     onEditNotes: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onShowMap: (() -> Unit)? = null
 ) {
     val dateFormat = remember { SimpleDateFormat("dd.MM.yyyy", Locale.GERMAN) }
     val formattedDate = remember(beer.timestamp) { dateFormat.format(Date(beer.timestamp)) }
@@ -658,20 +674,34 @@ fun SavedBeerCard(
                             )
                         }
                         if (!beer.origin.isNullOrBlank()) {
-                            Icon(
-                                imageVector = Icons.Default.Place,
-                                contentDescription = "Herkunft",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = beer.origin,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { onShowMap?.invoke() }
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Place,
+                                        contentDescription = "Herkunft (Karte)",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Text(
+                                        text = beer.origin,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }

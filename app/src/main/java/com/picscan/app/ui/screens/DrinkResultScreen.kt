@@ -29,6 +29,8 @@ import coil.compose.AsyncImage
 import com.picscan.app.data.model.BeerListType
 import com.picscan.app.data.model.BeerVerdict
 import com.picscan.app.data.repository.FirebaseBeerRepository
+import androidx.compose.foundation.clickable
+import com.picscan.app.ui.components.BreweryLocationMapBottomSheet
 import com.picscan.app.ui.components.BeerVerdictCard
 import com.picscan.app.ui.components.BeerVerdictCelebrationDialog
 import com.picscan.app.ui.components.DrinkCategoryBadge
@@ -78,6 +80,17 @@ fun DrinkResultScreen(
     }
 
     var showEditNoteDialog by remember { mutableStateOf(false) }
+    var showBreweryMapSheet by remember { mutableStateOf(false) }
+
+    // Display interactive map bottom sheet for brewery/origin
+    if (showBreweryMapSheet && !drink.origin.isNullOrBlank()) {
+        BreweryLocationMapBottomSheet(
+            beerName = drink.name,
+            brandOrProducer = drink.brandOrProducer,
+            origin = drink.origin,
+            onDismiss = { showBreweryMapSheet = false }
+        )
+    }
 
     // Display animated modal overlay on scan
     if (showBeerAlert && beerVerdict != BeerVerdict.NONE) {
@@ -539,7 +552,7 @@ fun DrinkResultScreen(
                 }
             }
 
-            // Genaue Herkunft / Brauort Banner
+            // Genaue Herkunft / Brauort Banner (Interaktiv mit Kartenanzeige)
             if (!drink.origin.isNullOrBlank()) {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
@@ -553,7 +566,10 @@ fun DrinkResultScreen(
                         ),
                         width = 1.dp
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { showBreweryMapSheet = true }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -587,6 +603,31 @@ fun DrinkResultScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+
+                        // Badge / Hint: "Karte"
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Map,
+                                    contentDescription = "Karte",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Karte",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }

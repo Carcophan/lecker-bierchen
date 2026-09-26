@@ -110,4 +110,30 @@ class FirebaseBeerRepositoryTest {
         org.junit.Assert.assertEquals("München, Bayern, Deutschland", restored.origin)
         org.junit.Assert.assertEquals("München, Bayern, Deutschland", restored.toDrinkDetails().origin)
     }
+
+    @Test
+    fun testSavedBeerItem_preservesCoordinates() {
+        val drink = com.picscan.app.data.model.DrinkDetails(
+            name = "Erdinger Weißbier",
+            brandOrProducer = "Erdinger Weißbräu",
+            origin = "Erding, Bayern, Deutschland"
+        )
+        val saved = com.picscan.app.data.model.SavedBeerItem.fromDrinkDetails(
+            id = "test-coords",
+            drink = drink,
+            listType = com.picscan.app.data.model.BeerListType.KNOWN,
+            latitude = 48.3060,
+            longitude = 11.9069
+        )
+        org.junit.Assert.assertEquals(48.3060, saved.latitude!!, 0.0001)
+        org.junit.Assert.assertEquals(11.9069, saved.longitude!!, 0.0001)
+
+        val map = saved.toMap()
+        org.junit.Assert.assertEquals(48.3060, map["latitude"])
+        org.junit.Assert.assertEquals(11.9069, map["longitude"])
+
+        val restored = com.picscan.app.data.model.SavedBeerItem.fromMap("test-coords", map)
+        org.junit.Assert.assertEquals(48.3060, restored.latitude!!, 0.0001)
+        org.junit.Assert.assertEquals(11.9069, restored.longitude!!, 0.0001)
+    }
 }

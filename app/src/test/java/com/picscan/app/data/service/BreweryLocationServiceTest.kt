@@ -27,13 +27,22 @@ class BreweryLocationServiceTest {
     }
 
     @Test
-    fun testGeocodeWithNominatim_validLocation() {
-        val result = BreweryLocationService.geocodeWithNominatim("München, Deutschland")
-        // If test environment has internet access, result will be populated
-        if (result != null) {
-            assertTrue(result.latitude > 47.0 && result.latitude < 49.0)
-            assertTrue(result.longitude > 10.0 && result.longitude < 13.0)
-            assertTrue(result.displayName.contains("München", ignoreCase = true))
-        }
+    fun testFindPredefinedLocation_cities() {
+        val munich = BreweryLocationService.findPredefinedLocation("München, Bayern, Deutschland")
+        assertNotNull(munich)
+        assertEquals(48.1371, munich!!.latitude, 0.01)
+        assertEquals(11.5761, munich.longitude, 0.01)
+
+        val dublin = BreweryLocationService.findPredefinedLocation("St. James's Gate", "Guinness Dublin")
+        assertNotNull(dublin)
+        assertEquals(53.3498, dublin!!.latitude, 0.01)
+        assertEquals(-6.2603, dublin.longitude, 0.01)
+
+        val pilsen = BreweryLocationService.findPredefinedLocation("Plzeň, Tschechien")
+        assertNotNull(pilsen)
+        assertEquals(49.7474, pilsen!!.latitude, 0.01)
+
+        val unknown = BreweryLocationService.findPredefinedLocation("FantasieOrt12345")
+        assertNull(unknown)
     }
 }

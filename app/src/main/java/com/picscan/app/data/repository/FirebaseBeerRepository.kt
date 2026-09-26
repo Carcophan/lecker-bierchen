@@ -703,6 +703,22 @@ class FirebaseBeerRepository(
         syncBeerToFirestore(updated)
     }
 
+    suspend fun updateBeerCoordinates(
+        beerId: String,
+        latitude: Double,
+        longitude: Double
+    ) = withContext(Dispatchers.IO) {
+        val item = _beersFlow.value.find { it.id == beerId } ?: return@withContext
+        if (item.latitude == latitude && item.longitude == longitude) return@withContext
+        val updated = item.copy(latitude = latitude, longitude = longitude)
+
+        val updatedList = _beersFlow.value.map { if (it.id == beerId) updated else it }
+        _beersFlow.value = updatedList
+        persistLocalCache(updatedList)
+
+        syncBeerToFirestore(updated)
+    }
+
     suspend fun deleteBeer(beerId: String) = withContext(Dispatchers.IO) {
         val itemToDelete = _beersFlow.value.find { it.id == beerId }
 

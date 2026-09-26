@@ -15,6 +15,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.picscan.app.data.model.BeerListType
 import com.picscan.app.ui.screens.BeerCollectionScreen
+import com.picscan.app.ui.screens.BeerGlobeScreen
 import com.picscan.app.ui.screens.CameraScanScreen
 import com.picscan.app.ui.screens.DrinkResultScreen
 import com.picscan.app.ui.screens.HistoryScreen
@@ -78,6 +79,19 @@ fun PicScanNavigation(viewModel: ScannerViewModel) {
             BeerCollectionScreen(
                 viewModel = viewModel,
                 initialTab = BeerListType.KNOWN,
+                onNavigateBack = { navController.popBackStack() },
+                onBeerSelected = {
+                    navController.navigate("result")
+                },
+                onOpenGlobe = {
+                    navController.navigate("globe")
+                }
+            )
+        }
+
+        composable("globe") {
+            BeerGlobeScreen(
+                viewModel = viewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onBeerSelected = {
                     navController.navigate("result")

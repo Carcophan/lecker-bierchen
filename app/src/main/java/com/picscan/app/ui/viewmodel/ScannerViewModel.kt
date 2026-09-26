@@ -266,6 +266,12 @@ class ScannerViewModel(
         }
     }
 
+    fun updateBeerCoordinates(beerId: String, latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            beerRepo.updateBeerCoordinates(beerId, latitude, longitude)
+        }
+    }
+
     fun deleteBeerFromList(beerId: String) {
         viewModelScope.launch {
             beerRepo.deleteBeer(beerId)

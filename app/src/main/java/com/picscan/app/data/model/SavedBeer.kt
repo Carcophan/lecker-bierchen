@@ -59,7 +59,9 @@ data class SavedBeerItem(
     val tastingNotes: List<String> = emptyList(),
     val glassware: String = "Standardglas",
     val idealTemperature: String = "Gekühlt (4-7 °C)",
-    val foodPairings: List<String> = emptyList()
+    val foodPairings: List<String> = emptyList(),
+    val latitude: Double? = null,
+    val longitude: Double? = null
 ) {
     fun toDrinkDetails(): DrinkDetails {
         return DrinkDetails(
@@ -113,7 +115,9 @@ data class SavedBeerItem(
             "tastingNotes" to tastingNotes,
             "glassware" to glassware,
             "idealTemperature" to idealTemperature,
-            "foodPairings" to foodPairings
+            "foodPairings" to foodPairings,
+            "latitude" to latitude,
+            "longitude" to longitude
         )
     }
 
@@ -127,7 +131,9 @@ data class SavedBeerItem(
             imageBase64: String? = null,
             rating: Float = 0f,
             userNotes: String = "",
-            timestamp: Long = System.currentTimeMillis()
+            timestamp: Long = System.currentTimeMillis(),
+            latitude: Double? = null,
+            longitude: Double? = null
         ): SavedBeerItem {
             val resolvedVerdict = drink.resolveBeerVerdict()
             return SavedBeerItem(
@@ -155,7 +161,9 @@ data class SavedBeerItem(
                 tastingNotes = drink.flavorProfile.tastingNotes,
                 glassware = drink.servingRecommendations.glassware,
                 idealTemperature = drink.servingRecommendations.idealTemperature,
-                foodPairings = drink.servingRecommendations.foodPairings
+                foodPairings = drink.servingRecommendations.foodPairings,
+                latitude = latitude,
+                longitude = longitude
             )
         }
 
@@ -242,6 +250,12 @@ data class SavedBeerItem(
                 ?: (nestedDrink?.get("foodPairings") as? List<*>)?.mapNotNull { it?.toString() }
                 ?: emptyList()
 
+            val latitude = (map["latitude"] as? Number)?.toDouble()
+                ?: (nestedDrink?.get("latitude") as? Number)?.toDouble()
+
+            val longitude = (map["longitude"] as? Number)?.toDouble()
+                ?: (nestedDrink?.get("longitude") as? Number)?.toDouble()
+
             return SavedBeerItem(
                 id = id,
                 name = name,
@@ -267,7 +281,9 @@ data class SavedBeerItem(
                 tastingNotes = tastingNotesList,
                 glassware = (map["glassware"] as? String) ?: "Standardglas",
                 idealTemperature = (map["idealTemperature"] as? String) ?: "Gekühlt (4-7 °C)",
-                foodPairings = foodPairingsList
+                foodPairings = foodPairingsList,
+                latitude = latitude,
+                longitude = longitude
             )
         }
     }

@@ -55,7 +55,8 @@ fun BeerCollectionScreen(
     viewModel: ScannerViewModel,
     initialTab: BeerListType = BeerListType.KNOWN,
     onNavigateBack: () -> Unit,
-    onBeerSelected: (SavedBeerItem) -> Unit
+    onBeerSelected: (SavedBeerItem) -> Unit,
+    onOpenGlobe: () -> Unit = {}
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
     var searchQuery by remember { mutableStateOf("") }
@@ -156,6 +157,14 @@ fun BeerCollectionScreen(
                                 )
                             }
                         }
+                    }
+
+                    IconButton(onClick = onOpenGlobe) {
+                        Icon(
+                            imageVector = Icons.Default.Public,
+                            contentDescription = "3D Bier-Globus öffnen",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
 
                     Box {
@@ -289,6 +298,57 @@ fun BeerCollectionScreen(
                         }
                     }
                 )
+            }
+
+            // 3D Globe Launch Banner
+            Surface(
+                onClick = onOpenGlobe,
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("🌍", fontSize = 18.sp)
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "Interaktiver 3D Bier-Globus",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Alle Brauerei-Standorte auf der Weltkugel starten",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             // Search Bar & Filter Chips

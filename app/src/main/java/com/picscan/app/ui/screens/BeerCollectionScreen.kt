@@ -637,13 +637,43 @@ fun SavedBeerCard(
 
                 // Producer / Brand & Origin
                 if (!beer.brandOrProducer.isNullOrBlank() || !beer.origin.isNullOrBlank()) {
-                    Text(
-                        text = listOfNotNull(beer.brandOrProducer, beer.origin).joinToString(" • "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (!beer.brandOrProducer.isNullOrBlank()) {
+                            Text(
+                                text = beer.brandOrProducer,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (!beer.brandOrProducer.isNullOrBlank() && !beer.origin.isNullOrBlank()) {
+                            Text(
+                                text = "•",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (!beer.origin.isNullOrBlank()) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = "Herkunft",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = beer.origin,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
 
                 // Star Rating & User Notes Preview

@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -116,6 +117,7 @@ fun DrinkResultScreen(
                                 appendLine("Bier-Bewertung: ${beerVerdict.emoji} ${beerVerdict.title}")
                             }
                             if (!drink.brandOrProducer.isNullOrBlank()) appendLine("Marke / Brauerei: ${drink.brandOrProducer}")
+                            if (!drink.origin.isNullOrBlank()) appendLine("Herkunft / Brauort: 📍 ${drink.origin}")
                             if (!drink.abvOrCaffeine.isNullOrBlank()) appendLine("Alkohol / Koffein: ${drink.abvOrCaffeine}")
                             appendLine("\n${drink.description}")
                             if (drink.flavorProfile.tastingNotes.isNotEmpty()) {
@@ -516,7 +518,7 @@ fun DrinkResultScreen(
                 }
             }
 
-            // Header info (Category, Name, Brand, Origin)
+            // Header info (Category, Name, Brand)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DrinkCategoryBadge(category = drink.category)
 
@@ -527,13 +529,66 @@ fun DrinkResultScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                if (!drink.brandOrProducer.isNullOrBlank() || !drink.origin.isNullOrBlank()) {
+                if (!drink.brandOrProducer.isNullOrBlank()) {
                     Text(
-                        text = listOfNotNull(drink.brandOrProducer, drink.origin).joinToString(" • "),
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = drink.brandOrProducer,
+                        style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
                     )
+                }
+            }
+
+            // Genaue Herkunft / Brauort Banner
+            if (!drink.origin.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = CardDefaults.outlinedCardBorder().copy(
+                        brush = Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.4f)
+                            )
+                        ),
+                        width = 1.dp
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Place,
+                                    contentDescription = "Herkunft",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Genaue Herkunft / Brauort",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = drink.origin,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
             }
 

@@ -44,7 +44,8 @@ fun HistoryScreen(
             historyList.filter {
                 it.drink.name.contains(searchQuery, ignoreCase = true) ||
                 it.drink.category.contains(searchQuery, ignoreCase = true) ||
-                (it.drink.brandOrProducer?.contains(searchQuery, ignoreCase = true) == true)
+                (it.drink.brandOrProducer?.contains(searchQuery, ignoreCase = true) == true) ||
+                (it.drink.origin?.contains(searchQuery, ignoreCase = true) == true)
             }
         }
     }
@@ -224,6 +225,25 @@ fun HistoryCard(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
+                if (!item.drink.origin.isNullOrBlank()) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = "Herkunft",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = item.drink.origin,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                }
                 Text(
                     text = formattedDate,
                     style = MaterialTheme.typography.labelSmall,

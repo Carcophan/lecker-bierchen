@@ -55,6 +55,10 @@ class GeminiDrinkScannerRepository {
                 4. "PENNERGLUECK": Stufe 4 (Sparfuchs-Dosenkracher). Günstige Discounter-Dosenbiere, Sparfuchs-Kultbiere (z. B. Oettinger, 5,0 Original, Hansa Pils, Paderborner, Karlskrone, Turmbräu, Schultenbräu, Adelskronen, Meisterbräu).
                 5. "PISSBRUEHE": Stufe 5 (Untrinkbare Plörre / Notstand). Wässrige Plörre, berüchtigt schlechtes Billigstbier oder abgestandenes Bier (z. B. Perlenbacher, Natty Light / Natural Light, Keystone Light, schales/abgestandenes Bier).
                 
+                BIER-HERKUNFTS-ANWEISUNG (SEHR WICHTIG):
+                Falls das Getränk ein BIER ist, ermittle und nenne im Feld "origin" stets die GENAUE HERKUNFT:
+                Exakter Brauort bzw. Stadt/Gemeinde der Brauerei, das Bundesland / die Region sowie das Land (z. B. "München, Bayern, Deutschland", "Köln, Nordrhein-Westfalen, Deutschland", "Krombach (Kreuztal), Nordrhein-Westfalen, Deutschland", "Einbeck, Niedersachsen, Deutschland", "Jever, Friesland, Deutschland", "Plzeň (Pilsen), Tschechien", "Dublin, Irland").
+                
                 Falls es KEIN Bier ist (z. B. Wein, Kaffee, Tee, Cocktail, Limonade, Saft, Wasser, Energy-Drink, Spirituose), setze "beerVerdict": "NONE" und "beerVerdictReason": null.
 
                 Gib ein valides, eigenständiges JSON-Objekt mit exakt diesen Feldern auf DEUTSCH zurück:
@@ -62,7 +66,7 @@ class GeminiDrinkScannerRepository {
                   "name": "Genauer Getränkename und Sorte/Edition",
                   "category": "z. B. Rotwein, Weißwein, Craft-Bier / IPA, Pils, Helles, Espresso, Cocktail, Matcha, Energy-Drink, Limonade, Mineralwasser, Kombucha, Whiskey, Gin",
                   "brandOrProducer": "Marke, Brauerei, Weingut, Rösterei oder Destillerie",
-                  "origin": "Herkunftsland / Region (z. B. Bordeaux, Frankreich oder Bayern, Deutschland oder Kyoto, Japan)",
+                  "origin": "Genaue Herkunft: Bei Bier zwingend exakter Brauort (Stadt/Gemeinde), Bundesland/Region und Land (z. B. 'München, Bayern, Deutschland', 'Köln, NRW, Deutschland', 'Plzeň, Tschechien'); bei anderen Getränken Herkunftsregion und Land",
                   "abvOrCaffeine": "Alkoholgehalt (z. B. '5,2 % vol.') oder Koffeingehalt (z. B. '120 mg Koffein') oder 'Alkoholfrei'",
                   "description": "Ansprechende, sensorische Beschreibung auf Deutsch über Geschmack, Herkunft und Besonderheiten (2-3 Sätze)",
                   "beerVerdict": "HOPFENBOMBE | LECKER_BIERCHEN | WEGBIER | PENNERGLUECK | PISSBRUEHE | NONE",

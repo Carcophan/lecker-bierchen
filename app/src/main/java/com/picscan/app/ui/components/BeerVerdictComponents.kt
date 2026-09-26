@@ -249,6 +249,32 @@ fun BeerVerdictCard(
                 )
             }
 
+            if (!drink.origin.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.Black.copy(alpha = 0.25f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = "Herkunft",
+                            tint = config.textColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = drink.origin,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.95f)
+                        )
+                    }
+                }
+            }
+
             Text(
                 text = drink.beerVerdictReason ?: verdict.subtitle,
                 style = MaterialTheme.typography.bodyMedium,
@@ -465,6 +491,34 @@ fun BeerVerdictCelebrationDialog(
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
+
+                // Origin
+                if (!drink.origin.isNullOrBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.15f)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Place,
+                                contentDescription = "Herkunft",
+                                tint = config.textColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = drink.origin,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.95f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
 
                 // Description Reason
                 Text(

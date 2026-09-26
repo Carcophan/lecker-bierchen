@@ -88,4 +88,26 @@ class FirebaseBeerRepositoryTest {
             )
         )
     }
+
+    @Test
+    fun testSavedBeerItem_preservesExactOrigin() {
+        val drink = com.picscan.app.data.model.DrinkDetails(
+            name = "Augustiner Lagerbier Hell",
+            brandOrProducer = "Augustiner-Bräu",
+            origin = "München, Bayern, Deutschland"
+        )
+        val saved = com.picscan.app.data.model.SavedBeerItem.fromDrinkDetails(
+            id = "test-123",
+            drink = drink,
+            listType = com.picscan.app.data.model.BeerListType.KNOWN
+        )
+        org.junit.Assert.assertEquals("München, Bayern, Deutschland", saved.origin)
+
+        val map = saved.toMap()
+        org.junit.Assert.assertEquals("München, Bayern, Deutschland", map["origin"])
+
+        val restored = com.picscan.app.data.model.SavedBeerItem.fromMap("test-123", map)
+        org.junit.Assert.assertEquals("München, Bayern, Deutschland", restored.origin)
+        org.junit.Assert.assertEquals("München, Bayern, Deutschland", restored.toDrinkDetails().origin)
+    }
 }

@@ -32,7 +32,6 @@ import com.picscan.app.data.repository.FirebaseBeerRepository
 import androidx.compose.foundation.clickable
 import com.picscan.app.ui.components.BreweryLocationMapBottomSheet
 import com.picscan.app.ui.components.BeerVerdictCard
-import com.picscan.app.ui.components.BeerVerdictCelebrationDialog
 import com.picscan.app.ui.components.DrinkCategoryBadge
 import com.picscan.app.ui.components.InfoChip
 import com.picscan.app.ui.components.LevelIndicator
@@ -68,7 +67,6 @@ fun DrinkResultScreen(
 
     val scrollState = rememberScrollState()
     val beerVerdict = remember(drink) { drink.resolveBeerVerdict() }
-    var showBeerAlert by remember(drink) { mutableStateOf(beerVerdict != BeerVerdict.NONE) }
 
     // Check if this beer is already in the Firebase database using robust matching
     val savedBeer = remember(allSavedBeers, drink) {
@@ -89,14 +87,6 @@ fun DrinkResultScreen(
             brandOrProducer = drink.brandOrProducer,
             origin = drink.origin,
             onDismiss = { showBreweryMapSheet = false }
-        )
-    }
-
-    // Display animated modal overlay on scan
-    if (showBeerAlert && beerVerdict != BeerVerdict.NONE) {
-        BeerVerdictCelebrationDialog(
-            drink = drink,
-            onDismiss = { showBeerAlert = false }
         )
     }
 
@@ -251,8 +241,7 @@ fun DrinkResultScreen(
             // Beer Verdict Feature Banner (5-Tier Beer Ranking)
             if (beerVerdict != BeerVerdict.NONE) {
                 BeerVerdictCard(
-                    drink = drink,
-                    onShowFullAlert = { showBeerAlert = true }
+                    drink = drink
                 )
             }
 

@@ -1,35 +1,20 @@
 package com.picscan.app.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColor
-import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.picscan.app.data.model.BeerVerdict
 import com.picscan.app.data.model.DrinkDetails
 
@@ -117,13 +102,11 @@ private fun getVisualConfig(verdict: BeerVerdict): VerdictVisualConfig {
 }
 
 /**
- * Animated Celebration or Warning Banner displayed directly on DrinkResultScreen for the 5-Tier Beer Ranking.
- * Tuned for subtle, pleasant and non-intrusive motion.
+ * Banner displayed directly on DrinkResultScreen for the 5-Tier Beer Ranking.
  */
 @Composable
 fun BeerVerdictCard(
     drink: DrinkDetails,
-    onShowFullAlert: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val verdict = remember(drink) { drink.resolveBeerVerdict() }
@@ -131,72 +114,16 @@ fun BeerVerdictCard(
 
     val config = remember(verdict) { getVisualConfig(verdict) }
 
-    // Subtle ambient breathing animation
-    val infiniteTransition = rememberInfiniteTransition(label = "beerVerdictTransition")
-    
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.995f,
-        targetValue = 1.008f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1500
-                    BeerVerdict.LECKER_BIERCHEN -> 1800
-                    BeerVerdict.WEGBIER -> 2000
-                    BeerVerdict.PENNERGLUECK -> 1700
-                    BeerVerdict.PISSBRUEHE -> 1400
-                    BeerVerdict.NONE -> 2000
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
-    val flashAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1600
-                    BeerVerdict.PISSBRUEHE -> 1400
-                    else -> 2000
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flashAlpha"
-    )
-
-    val shakeOffset by infiniteTransition.animateFloat(
-        initialValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) -0.8f else 0f,
-        targetValue = if (verdict == BeerVerdict.PISSBRUEHE || verdict == BeerVerdict.HOPFENBOMBE) 0.8f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(700, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "shakeOffset"
-    )
-
     val cardBrush = Brush.linearGradient(
         colors = listOf(
-            config.primaryColor.copy(alpha = flashAlpha),
-            config.secondaryColor.copy(alpha = flashAlpha),
-            config.primaryColor.copy(alpha = flashAlpha)
+            config.primaryColor,
+            config.secondaryColor,
+            config.primaryColor
         )
     )
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(pulseScale)
-            .offset(x = shakeOffset.dp)
-            .clickable {
-                onShowFullAlert()
-            },
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = config.containerBgColor
@@ -282,322 +209,6 @@ fun BeerVerdictCard(
                 color = Color.White.copy(alpha = 0.9f),
                 fontWeight = FontWeight.Medium
             )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            FilledTonalButton(
-                onClick = onShowFullAlert,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = config.buttonColor,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Fullscreen,
-                    contentDescription = "Animation",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Animation anzeigen", fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-/**
- * Fullscreen Interactive Dialog with gentle atmospheric animations for 5-Tier Beer Ranking.
- */
-@Composable
-fun BeerVerdictCelebrationDialog(
-    drink: DrinkDetails,
-    onDismiss: () -> Unit
-) {
-    val verdict = remember(drink) { drink.resolveBeerVerdict() }
-    if (verdict == BeerVerdict.NONE) return
-
-    val config = remember(verdict) { getVisualConfig(verdict) }
-    val infiniteTransition = rememberInfiniteTransition(label = "fullscreenBeerAlert")
-
-    // Gentle atmospheric background glow
-    val strobeColor1 by infiniteTransition.animateColor(
-        initialValue = config.primaryColor.copy(alpha = 0.70f),
-        targetValue = config.secondaryColor.copy(alpha = 0.70f),
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1600
-                    BeerVerdict.PISSBRUEHE -> 1500
-                    else -> 2200
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "strobeColor1"
-    )
-
-    val strobeColor2 by infiniteTransition.animateColor(
-        initialValue = Color.Black.copy(alpha = 0.95f),
-        targetValue = config.containerBgColor.copy(alpha = 0.95f),
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1600
-                    BeerVerdict.PISSBRUEHE -> 1500
-                    else -> 2200
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "strobeColor2"
-    )
-
-    // Subtle gentle breathing pulse
-    val scalePulse by infiniteTransition.animateFloat(
-        initialValue = 0.985f,
-        targetValue = 1.015f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1600
-                    BeerVerdict.PISSBRUEHE -> 1400
-                    else -> 2000
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scalePulse"
-    )
-
-    // Subtle gentle wobble tilt
-    val rotationWobble by infiniteTransition.animateFloat(
-        initialValue = when (verdict) {
-            BeerVerdict.PISSBRUEHE -> -1.5f
-            BeerVerdict.HOPFENBOMBE -> -1.2f
-            BeerVerdict.PENNERGLUECK -> -1.0f
-            else -> -0.6f
-        },
-        targetValue = when (verdict) {
-            BeerVerdict.PISSBRUEHE -> 1.5f
-            BeerVerdict.HOPFENBOMBE -> 1.2f
-            BeerVerdict.PENNERGLUECK -> 1.0f
-            else -> 0.6f
-        },
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                when (verdict) {
-                    BeerVerdict.HOPFENBOMBE -> 1400
-                    BeerVerdict.PISSBRUEHE -> 1200
-                    else -> 1800
-                },
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "rotationWobble"
-    )
-
-    val shakeX by infiniteTransition.animateFloat(
-        initialValue = if (verdict == BeerVerdict.PISSBRUEHE) -1.2f else 0f,
-        targetValue = if (verdict == BeerVerdict.PISSBRUEHE) 1.2f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(600, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "shakeX"
-    )
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(strobeColor1, strobeColor2)
-                    )
-                )
-                .clickable { onDismiss() }
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Floating Decorative Emoticons matching tier
-            VerdictFloatingParticles(verdict = verdict)
-
-            // Main Alert Card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .scale(scalePulse)
-                    .offset(x = shakeX.dp)
-                    .rotate(rotationWobble)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(Color.Black.copy(alpha = 0.90f))
-                    .border(
-                        width = 2.5.dp,
-                        brush = Brush.linearGradient(
-                            listOf(Color.White.copy(alpha = 0.8f), config.primaryColor, config.secondaryColor, Color.White.copy(alpha = 0.8f))
-                        ),
-                        shape = RoundedCornerShape(28.dp)
-                    )
-                    .padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Tier Header
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = config.buttonColor.copy(alpha = 0.4f)
-                ) {
-                    Text(
-                        text = config.tierLabel,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = config.textColor,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                    )
-                }
-
-                // Header icons
-                Text(
-                    text = config.bannerEmojis,
-                    fontSize = 24.sp
-                )
-
-                // Title
-                Text(
-                    text = verdict.title,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Black,
-                    color = config.textColor,
-                    textAlign = TextAlign.Center,
-                    letterSpacing = 1.5.sp
-                )
-
-                // Drink Name
-                Text(
-                    text = drink.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-
-                // Origin
-                if (!drink.origin.isNullOrBlank()) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.15f)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Place,
-                                contentDescription = "Herkunft",
-                                tint = config.textColor,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = drink.origin,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White.copy(alpha = 0.95f),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-
-                // Description Reason
-                Text(
-                    text = drink.beerVerdictReason ?: verdict.subtitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center,
-                    color = Color.White.copy(alpha = 0.95f),
-                    fontWeight = FontWeight.Medium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Action button inside dialog
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-
-                    Button(
-                        onClick = onDismiss,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White.copy(alpha = 0.25f)
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text(
-                            text = when (verdict) {
-                                BeerVerdict.HOPFENBOMBE -> "Explosion! 💣"
-                                BeerVerdict.LECKER_BIERCHEN -> "Prost! 🍻"
-                                BeerVerdict.WEGBIER -> "Weiterlaufen! 🚶‍♂️"
-                                BeerVerdict.PENNERGLUECK -> "Ex und hopp! 🥫"
-                                BeerVerdict.PISSBRUEHE -> "Weg damit! 🗑️"
-                                BeerVerdict.NONE -> "OK"
-                            },
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VerdictFloatingParticles(verdict: BeerVerdict) {
-    val infiniteTransition = rememberInfiniteTransition(label = "verdictParticles")
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.35f,
-        targetValue = 0.75f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                if (verdict == BeerVerdict.HOPFENBOMBE || verdict == BeerVerdict.PISSBRUEHE) 1600 else 2200,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "particleAlpha"
-    )
-
-    val particles = remember(verdict) {
-        when (verdict) {
-            BeerVerdict.HOPFENBOMBE -> listOf("💣", "💥", "🌿", "🚀", "✨", "🔥")
-            BeerVerdict.LECKER_BIERCHEN -> listOf("🍻", "✨", "🍺", "👑", "⭐", "🎉")
-            BeerVerdict.WEGBIER -> listOf("🚶‍♂️", "🍺", "👟", "🏙️", "🎶", "🌿")
-            BeerVerdict.PENNERGLUECK -> listOf("🥫", "🥴", "🪙", "🛒", "💨", "🍺")
-            BeerVerdict.PISSBRUEHE -> listOf("☣️", "🤢", "🝽", "⚠️", "❌", "🤮")
-            BeerVerdict.NONE -> emptyList()
-        }
-    }
-
-    if (particles.size >= 6) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Text(particles[0], fontSize = 28.sp, modifier = Modifier.align(Alignment.TopStart).padding(30.dp).scale(0.9f + alpha * 0.15f))
-            Text(particles[1], fontSize = 30.sp, modifier = Modifier.align(Alignment.TopEnd).padding(40.dp).scale(0.9f + alpha * 0.15f))
-            Text(particles[2], fontSize = 26.sp, modifier = Modifier.align(Alignment.BottomStart).padding(50.dp).scale(0.9f + alpha * 0.15f))
-            Text(particles[3], fontSize = 30.sp, modifier = Modifier.align(Alignment.BottomEnd).padding(30.dp).scale(0.9f + alpha * 0.15f))
-            Text(particles[4], fontSize = 24.sp, modifier = Modifier.align(Alignment.CenterStart).padding(20.dp).scale(0.9f + alpha * 0.15f))
-            Text(particles[5], fontSize = 24.sp, modifier = Modifier.align(Alignment.CenterEnd).padding(20.dp).scale(0.9f + alpha * 0.15f))
         }
     }
 }
